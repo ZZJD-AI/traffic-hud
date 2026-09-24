@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>HUD Speed Advisor</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body {
+      background-color: #000000;
+      color: #FFFFFF;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 24px 20px;
+      overflow: hidden;
+    }
+    body.mirrored {
+      transform: scaleX(-1);
+    }
+    
+    /* TOP BAR */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+    }
+    .speed-limit-badge {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background-color: #FFFFFF;
+      border: 6px solid #D50000;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: #000000;
+      font-size: 26px;
+      font-weight: 900;
+    }
+    .controls {
+      display: flex;
+      gap: 10px;
+    }
+    .btn {
+      background-color: #1C1C1E;
+      border: 1px solid #3A3A3C;
+      color: #8E8E93;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn.active {
+      color: #00E5FF;
+      border-color: #00E5FF;
+    }
+
+    /* CENTRO: VELOCITÀ */
+    .speed-display {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      margin-top: -20px;
+    }
+    .current-speed {
+      font-size: 130px;
+      font-weight: 900;
+      line-height: 120px;
+      color: #00E5FF;
+      letter-spacing: -3px;
+      font-variant-numeric: tabular-nums;
+    }
+    .speed-unit {
+      color: #8E8E93;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      margin-top: 6px;
+    }
+    .advised-box {
+      margin-top: 14px;
+      padding: 6px 16px;
+      border-radius: 20px;
+      background-color: #121212;
+      border: 1px solid #242424;
+      font-size: 14px;
+      color: #A0A0A5;
+    }
+    .advised-box span {
+      color: #FFB300;
+      font-weight: 800;
+    }
+
+    /* BOTTOM BAR */
+    .bottom-bar {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+    }
+    .status-card {
+      background-color: #121212;
+      border: 1px solid #242424;
+      border-radius: 14px;
+      padding: 14px;
+      text-align: center;
+    }
+    .status-msg {
+      font-size: 14px;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      color: #00E5FF;
+      margin-bottom: 6px;
+    }
+    .telemetry-mini {
+      display: flex;
+      justify-content: space-around;
+      font-size: 12px;
+      color: #636366;
+    }
+    .telemetry-mini b {
+      color: #FFFFFF;
+    }
+    .btn-main {
+      width: 100%;
+      padding: 16px;
+      border-radius: 14px;
+      font-size: 16px;
+      font-weight: 800;
+      border: none;
+      cursor: pointer;
+    }
+    .btn-start {
+      background-color: #00E5FF;
+      color: #000000;
+    }
+    .btn-stop {
+      background-color: #D50000;
+      color: #FFFFFF;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOP BAR -->
+  <div class="top-bar">
+    <div class="speed-limit-badge" id="speedLimit">--</div>
+    <div class="controls">
+      <button class="btn" id="btnAudio" onclick="toggleAudio()">AUDIO: ON</button>
+      <button class="btn" id="btnMirror" onclick="toggleMirror()">HUD MIRROR</button>
+    </div>
+  </div>
+
+  <!-- SPEED HUD -->
+  <div class="speed-display">
+    <div class="current-speed" id="gpsSpeed">0</div>
+    <div class="speed-unit">KM/H REALI</div>
+    <div class="advised-box">
+      CONSIGLIATA: <span id="advisedSpeed">--</span> KM/H
+    </div>
+  </div>
+
+  <!-- STATUS & LOG -->
+  <div class="bottom-bar">
+    <div class="status-card">
+      <div class="status-msg" id="statusMsg">PRONTO ALLA PARTENZA</div>
+      <div class="telemetry-mini">
+        <span>Campioni: <b id="sampleCount">0</b></span>
+        <span>Stops: <b id="stopCount">0</b></span>
+        <span>Precisione: <b id="gpsAccuracy">--</b>m</span>
+      </div>
+    </div>
+    
+    <button class="btn-main btn-start" id="btnAction" onclick="toggleTrip()">
+      AVVIA VIAGGIO REALE
+    </button>
+  </div>
+
+  <script>
+    let isTracking = false;
+    let watchId = null;
+    let wakeLock = null;
+    let audioEnabled = true;
+
+    // Telemetria viaggio
+    let tripData = [];
+    let startTime = null;
+    let sampleCount = 0;
+    let stopCount = 0;
+    let currentLimit = 50;
+    let lastQueryPos = null;
+    let lastAdvisedSpeed = null;
+
+    // Elementi UI
+    const gpsSpeedEl = document.getElementById('gpsSpeed');
+    const advisedSpeedEl = document.getElementById('advisedSpeed');
+    const speedLimitEl = document.getElementById('speedLimit');
+    const statusMsgEl = document.getElementById('statusMsg');
+    const sampleCountEl = document.getElementById('sampleCount');
+    const stopCountEl = document.getElementById('stopCount');
+    const gpsAccuracyEl = document.getElementById('gpsAccuracy');
+    const btnAction = document.getElementById('btnAction');
+
+    // Attiva / Disattiva Viaggio
+    async function toggleTrip() {
+      if (!isTracking) {
+        startTrip();
+      } else {
+        stopTripAndExport();
+      }
+    }
+
+    async function startTrip() {
+      tripData = [];
+      sampleCount = 0;
+      stopCount = 0;
+      startTime = new Date();
+
+      // Richiesta WakeLock (impedisce lo spegnimento dello schermo su iPhone)
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (err) {
+        console.log("WakeLock non disponibile");
+      }
+
+      // Sblocco audio su iOS Safari al tocco
+      speak("Navigatore avviato");
+
+      // Avvio GPS ad alta precisione
+      if ("geolocation" in navigator) {
+        watchId = navigator.geolocation.watchPosition(
+          onGpsSuccess,
+          onGpsError,
+          { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+        );
+      } else {
+        alert("Geolocalizzazione non supportata su questo browser.");
+        return;
+      }
+
+      isTracking = true;
+      btnAction.innerText = "TERMINA E SALVA CSV";
+      btnAction.className = "btn-main btn-stop";
+      statusMsgEl.innerText = "ACQUISIZIONE SEGNALE GPS...";
+    }
+
+    function stopTripAndExport() {
+      // Ferma GPS e WakeLock
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      if (wakeLock !== null) wakeLock.release();
+      isTracking = false;
+
+      btnAction.innerText = "AVVIA VIAGGIO REALE";
+      btnAction.className = "btn-main btn-start";
+      statusMsgEl.innerText = "VIAGGIO COMPLETATO. ESPORTAZIONE...";
+
+      // Generazione e download del file CSV
+      esportaCSV();
+    }
+
+    // Callback GPS
+    function onGpsSuccess(pos) {
+      const coords = pos.coords;
+      const speedKmh = coords.speed !== null && coords.speed > 0 ? Math.round(coords.speed * 3.6) : 0;
+      const accuracy = Math.round(coords.accuracy);
+      const lat = coords.latitude;
+      const lon = coords.longitude;
+      const now = new Date();
+      const elapsedSec = Math.round((now - startTime) / 1000);
+
+      // Aggiorna UI Velocità
+      gpsSpeedEl.innerText = speedKmh;
+      gpsAccuracyEl.innerText = accuracy;
+
+      if (speedKmh === 0) stopCount++;
+      sampleCount++;
+      sampleCountEl.innerText = sampleCount;
+      stopCountEl.innerText = stopCount;
+
+      // Aggiorna limite stradale se ci siamo spostati > 250m
+      aggiornaLimiteStradale(lat, lon);
+
+      // Calcola smoothing (velocità target mai superiore al limite)
+      const targetSpeed = Math.min(speedKmh, currentLimit);
+      advisedSpeedEl.innerText = targetSpeed;
+
+      // Gestione stato visivo
+      let stato = "SCORREVOLE";
+      if (speedKmh > currentLimit) {
+        gpsSpeedEl.style.color = "#FF3D00";
+        statusMsgEl.innerText = "SUPERAMENTO LIMITE DI VELOCITÀ";
+        statusMsgEl.style.color = "#FF3D00";
+      } else {
+        gpsSpeedEl.style.color = "#00E5FF";
+        statusMsgEl.innerText = "FLUSSO REGOLARE";
+        statusMsgEl.style.color = "#00E5FF";
+      }
+
+      // Salva campione per il CSV
+      tripData.push({
+        iso: now.toISOString(),
+        secondi: elapsedSec,
+        lat: lat.toFixed(6),
+        lon: lon.toFixed(6),
+        speed: speedKmh,
+        limite: currentLimit,
+        target: targetSpeed,
+        accuratezza_m: accuracy,
+        stato: stato
+      });
+    }
+
+    function onGpsError(err) {
+      statusMsgEl.innerText = "ERRORE GPS: " + err.message;
+      statusMsgEl.style.color = "#FF3D00";
+    }
+
+    // Risoluzione limiti con OpenStreetMap Overpass API
+    async function aggiornaLimiteStradale(lat, lon) {
+      if (lastQueryPos) {
+        const d = distanzaMetri(lastQueryPos.lat, lastQueryPos.lon, lat, lon);
+        if (d < 250) return;
+      }
+      lastQueryPos = { lat, lon };
+
+      const query = `[out:json][timeout:3];way(around:35,${lat},${lon})[highway];out tags;`;
+      try {
+        const res = await fetch("https://overpass-api.de/api/interpreter", {
+          method: "POST",
+          body: "data=" + encodeURIComponent(query)
+        });
+        const data = await res.json();
+        
+        const fallback = {
+          "motorway": 130, "trunk": 110, "primary": 90,
+          "secondary": 90, "residential": 50, "living_street": 30
+        };
+
+        for (const el of data.elements || []) {
+          const tags = el.tags || {};
+          if (tags.maxspeed && !isNaN(parseInt(tags.maxspeed))) {
+            impostaLimite(parseInt(tags.maxspeed));
+            return;
+          }
+          if (tags.highway && fallback[tags.highway]) {
+            impostaLimite(fallback[tags.highway]);
+            return;
+          }
+        }
+      } catch (e) {
+        // Fallback offline / errore rete
+      }
+    }
+
+    function impostaLimite(nuovoLimite) {
+      if (nuovoLimite !== currentLimit) {
+        currentLimit = nuovoLimite;
+        speedLimitEl.innerText = currentLimit;
+        if (audioEnabled) speak("Limite " + currentLimit);
+      }
+    }
+
+    // Utility Matematiche
+    function distanzaMetri(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    // Sintesi vocale nativa iOS
+    function speak(text) {
+      if (!audioEnabled || !('speechSynthesis' in window)) return;
+      window.speechSynthesis.cancel();
+      const ut = new SpeechSynthesisUtterance(text);
+      ut.lang = 'it-IT';
+      ut.rate = 1.1;
+      window.speechSynthesis.speak(ut);
+    }
+
+    // Toggle Modalità Specchio e Audio
+    function toggleMirror() {
+      document.body.classList.toggle('mirrored');
+      document.getElementById('btnMirror').classList.toggle('active');
+    }
+
+    function toggleAudio() {
+      audioEnabled = !audioEnabled;
+      const btn = document.getElementById('btnAudio');
+      btn.innerText = audioEnabled ? "AUDIO: ON" : "AUDIO: OFF";
+      btn.classList.toggle('active', audioEnabled);
+    }
+
+    // Generazione Download CSV
+    function esportaCSV() {
+      if (tripData.length === 0) {
+        alert("Nessun dato registrato.");
+        return;
+      }
+
+      let csvContent = "timestamp_iso,secondi_trascorsi,latitudine,longitudine,velocita_gps_kmh,limite_vigente_kmh,velocita_consigliata_kmh,accuratezza_gps_m,stato\n";
+      tripData.forEach(row => {
+        csvContent += `${row.iso},${row.secondi},${row.lat},${row.lon},${row.speed},${row.limite},${row.target},${row.accuratezza_m},${row.stato}\n`;
+      });
+
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const d = new Date();
+      const filename = `viaggio_reale_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}.csv`;
+
+      link.setAttribute("href", url);
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  </script>
+</body>
+</html>
