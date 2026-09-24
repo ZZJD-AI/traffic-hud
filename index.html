@@ -3,6 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  
+  <!-- OTTIMIZZAZIONI SCHERMO INTERO PER IPHONE -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="HUD Speed">
+
   <title>HUD Speed Advisor</title>
   <style>
     * {
@@ -12,17 +18,29 @@
       user-select: none;
       -webkit-user-select: none;
     }
-    body {
+    
+    html, body {
       background-color: #000000;
       color: #FFFFFF;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      height: 100vh;
+      width: 100vw;
+      height: 100dvh; /* Altezza dinamica reale per iPhone */
+      height: -webkit-fill-available;
+      overflow: hidden;
+    }
+
+    body {
       display: flex;
       flex-direction: column;
       justify-content: space-between;
-      padding: 24px 20px;
-      overflow: hidden;
+      align-items: center;
+      /* Gestione precisa di Notch, Dynamic Island e barra di sblocco */
+      padding-top: max(16px, env(safe-area-inset-top));
+      padding-bottom: max(16px, env(safe-area-inset-bottom));
+      padding-left: max(20px, env(safe-area-inset-left));
+      padding-right: max(20px, env(safe-area-inset-right));
     }
+
     body.mirrored {
       transform: scaleX(-1);
     }
@@ -33,31 +51,33 @@
       justify-content: space-between;
       align-items: center;
       width: 100%;
+      max-width: 500px;
     }
     .speed-limit-badge {
-      width: 64px;
-      height: 64px;
+      width: 58px;
+      height: 58px;
       border-radius: 50%;
       background-color: #FFFFFF;
-      border: 6px solid #D50000;
+      border: 5px solid #D50000;
       display: flex;
       justify-content: center;
       align-items: center;
       color: #000000;
-      font-size: 26px;
+      font-size: 24px;
       font-weight: 900;
+      box-shadow: 0 0 10px rgba(255,255,255,0.2);
     }
     .controls {
       display: flex;
-      gap: 10px;
+      gap: 8px;
     }
     .btn {
       background-color: #1C1C1E;
       border: 1px solid #3A3A3C;
       color: #8E8E93;
-      padding: 8px 14px;
+      padding: 8px 12px;
       border-radius: 8px;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 700;
       cursor: pointer;
     }
@@ -66,37 +86,40 @@
       border-color: #00E5FF;
     }
 
-    /* CENTRO: VELOCITÀ */
+    /* CENTRO: VELOCITÀ PERFETTAMENTE A PIOMBO */
     .speed-display {
+      flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      margin-top: -20px;
+      width: 100%;
     }
     .current-speed {
-      font-size: 130px;
+      font-size: clamp(90px, 32vw, 155px);
       font-weight: 900;
-      line-height: 120px;
+      line-height: 0.9;
       color: #00E5FF;
-      letter-spacing: -3px;
+      letter-spacing: -4px;
       font-variant-numeric: tabular-nums;
+      text-align: center;
     }
     .speed-unit {
       color: #8E8E93;
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 700;
-      letter-spacing: 2px;
-      margin-top: 6px;
+      letter-spacing: 3px;
+      margin-top: 10px;
     }
     .advised-box {
-      margin-top: 14px;
-      padding: 6px 16px;
+      margin-top: 16px;
+      padding: 6px 18px;
       border-radius: 20px;
       background-color: #121212;
       border: 1px solid #242424;
-      font-size: 14px;
+      font-size: 13px;
       color: #A0A0A5;
+      letter-spacing: 0.5px;
     }
     .advised-box span {
       color: #FFB300;
@@ -107,27 +130,28 @@
     .bottom-bar {
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
       width: 100%;
+      max-width: 500px;
     }
     .status-card {
       background-color: #121212;
       border: 1px solid #242424;
-      border-radius: 14px;
-      padding: 14px;
+      border-radius: 12px;
+      padding: 10px 14px;
       text-align: center;
     }
     .status-msg {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 800;
       letter-spacing: 0.5px;
       color: #00E5FF;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
     .telemetry-mini {
       display: flex;
       justify-content: space-around;
-      font-size: 12px;
+      font-size: 11px;
       color: #636366;
     }
     .telemetry-mini b {
@@ -135,9 +159,9 @@
     }
     .btn-main {
       width: 100%;
-      padding: 16px;
-      border-radius: 14px;
-      font-size: 16px;
+      padding: 15px;
+      border-radius: 12px;
+      font-size: 15px;
       font-weight: 800;
       border: none;
       cursor: pointer;
@@ -150,11 +174,28 @@
       background-color: #D50000;
       color: #FFFFFF;
     }
+
+    /* ADATTAMENTO SE IL TELEFONO È IN ORIZZONTALE */
+    @media (orientation: landscape) {
+      body {
+        padding-top: max(8px, env(safe-area-inset-top));
+        padding-bottom: max(8px, env(safe-area-inset-bottom));
+      }
+      .current-speed {
+        font-size: clamp(80px, 24vh, 120px);
+      }
+      .status-card {
+        padding: 6px;
+      }
+      .btn-main {
+        padding: 10px;
+      }
+    }
   </style>
 </head>
 <body>
 
-  <!-- TOP BAR -->
+  <!-- TOP BAR: Limite Vigente e Controlli -->
   <div class="top-bar">
     <div class="speed-limit-badge" id="speedLimit">--</div>
     <div class="controls">
@@ -163,7 +204,7 @@
     </div>
   </div>
 
-  <!-- SPEED HUD -->
+  <!-- CENTRO: Velocità Istantanea e Consigliata -->
   <div class="speed-display">
     <div class="current-speed" id="gpsSpeed">0</div>
     <div class="speed-unit">KM/H REALI</div>
@@ -172,7 +213,7 @@
     </div>
   </div>
 
-  <!-- STATUS & LOG -->
+  <!-- BOTTOM BAR: Stato e Pulsante Azione -->
   <div class="bottom-bar">
     <div class="status-card">
       <div class="status-msg" id="statusMsg">PRONTO ALLA PARTENZA</div>
@@ -194,16 +235,15 @@
     let wakeLock = null;
     let audioEnabled = true;
 
-    // Telemetria viaggio
+    // Struttura dati per il log
     let tripData = [];
     let startTime = null;
     let sampleCount = 0;
     let stopCount = 0;
     let currentLimit = 50;
     let lastQueryPos = null;
-    let lastAdvisedSpeed = null;
 
-    // Elementi UI
+    // Riferimenti DOM
     const gpsSpeedEl = document.getElementById('gpsSpeed');
     const advisedSpeedEl = document.getElementById('advisedSpeed');
     const speedLimitEl = document.getElementById('speedLimit');
@@ -213,7 +253,6 @@
     const gpsAccuracyEl = document.getElementById('gpsAccuracy');
     const btnAction = document.getElementById('btnAction');
 
-    // Attiva / Disattiva Viaggio
     async function toggleTrip() {
       if (!isTracking) {
         startTrip();
@@ -228,7 +267,7 @@
       stopCount = 0;
       startTime = new Date();
 
-      // Richiesta WakeLock (impedisce lo spegnimento dello schermo su iPhone)
+      // Mantieni lo schermo sempre acceso
       try {
         if ('wakeLock' in navigator) {
           wakeLock = await navigator.wakeLock.request('screen');
@@ -237,10 +276,9 @@
         console.log("WakeLock non disponibile");
       }
 
-      // Sblocco audio su iOS Safari al tocco
       speak("Navigatore avviato");
 
-      // Avvio GPS ad alta precisione
+      // Avvia antenna GPS ad alta frequenza
       if ("geolocation" in navigator) {
         watchId = navigator.geolocation.watchPosition(
           onGpsSuccess,
@@ -259,7 +297,6 @@
     }
 
     function stopTripAndExport() {
-      // Ferma GPS e WakeLock
       if (watchId !== null) navigator.geolocation.clearWatch(watchId);
       if (wakeLock !== null) wakeLock.release();
       isTracking = false;
@@ -268,11 +305,9 @@
       btnAction.className = "btn-main btn-start";
       statusMsgEl.innerText = "VIAGGIO COMPLETATO. ESPORTAZIONE...";
 
-      // Generazione e download del file CSV
       esportaCSV();
     }
 
-    // Callback GPS
     function onGpsSuccess(pos) {
       const coords = pos.coords;
       const speedKmh = coords.speed !== null && coords.speed > 0 ? Math.round(coords.speed * 3.6) : 0;
@@ -282,7 +317,7 @@
       const now = new Date();
       const elapsedSec = Math.round((now - startTime) / 1000);
 
-      // Aggiorna UI Velocità
+      // Aggiornamento cruscotto
       gpsSpeedEl.innerText = speedKmh;
       gpsAccuracyEl.innerText = accuracy;
 
@@ -291,14 +326,14 @@
       sampleCountEl.innerText = sampleCount;
       stopCountEl.innerText = stopCount;
 
-      // Aggiorna limite stradale se ci siamo spostati > 250m
+      // Aggiorna limiti ogni 250 metri di spostamento
       aggiornaLimiteStradale(lat, lon);
 
-      // Calcola smoothing (velocità target mai superiore al limite)
+      // Calcolo velocità consigliata (mai sopra il limite legale)
       const targetSpeed = Math.min(speedKmh, currentLimit);
       advisedSpeedEl.innerText = targetSpeed;
 
-      // Gestione stato visivo
+      // Logica colori avviso
       let stato = "SCORREVOLE";
       if (speedKmh > currentLimit) {
         gpsSpeedEl.style.color = "#FF3D00";
@@ -310,7 +345,7 @@
         statusMsgEl.style.color = "#00E5FF";
       }
 
-      // Salva campione per il CSV
+      // Registrazione campione
       tripData.push({
         iso: now.toISOString(),
         secondi: elapsedSec,
@@ -329,7 +364,6 @@
       statusMsgEl.style.color = "#FF3D00";
     }
 
-    // Risoluzione limiti con OpenStreetMap Overpass API
     async function aggiornaLimiteStradale(lat, lon) {
       if (lastQueryPos) {
         const d = distanzaMetri(lastQueryPos.lat, lastQueryPos.lon, lat, lon);
@@ -337,7 +371,7 @@
       }
       lastQueryPos = { lat, lon };
 
-      const query = `[out:json][timeout:3];way(around:35,${lat},${lon})[highway];out tags;`;
+      const query = `[out:json][timeout:3];way(around:35,${lat},{lon})[highway];out tags;`;
       try {
         const res = await fetch("https://overpass-api.de/api/interpreter", {
           method: "POST",
@@ -362,7 +396,7 @@
           }
         }
       } catch (e) {
-        // Fallback offline / errore rete
+        // Mantiene l'ultimo limite noto in caso di galleria o offline
       }
     }
 
@@ -374,7 +408,6 @@
       }
     }
 
-    // Utility Matematiche
     function distanzaMetri(lat1, lon1, lat2, lon2) {
       const R = 6371000;
       const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -385,7 +418,6 @@
       return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
-    // Sintesi vocale nativa iOS
     function speak(text) {
       if (!audioEnabled || !('speechSynthesis' in window)) return;
       window.speechSynthesis.cancel();
@@ -395,7 +427,6 @@
       window.speechSynthesis.speak(ut);
     }
 
-    // Toggle Modalità Specchio e Audio
     function toggleMirror() {
       document.body.classList.toggle('mirrored');
       document.getElementById('btnMirror').classList.toggle('active');
@@ -408,7 +439,6 @@
       btn.classList.toggle('active', audioEnabled);
     }
 
-    // Generazione Download CSV
     function esportaCSV() {
       if (tripData.length === 0) {
         alert("Nessun dato registrato.");
