@@ -112,17 +112,15 @@
     }
     .advised-box {
       margin-top: 16px;
-      padding: 6px 18px;
+      padding: 8px 20px;
       border-radius: 20px;
       background-color: #121212;
       border: 1px solid #242424;
-      font-size: 13px;
-      color: #A0A0A5;
-      letter-spacing: 0.5px;
-    }
-    .advised-box span {
-      color: #FFB300;
+      font-size: 14px;
       font-weight: 800;
+      letter-spacing: 0.5px;
+      color: #00E5FF;
+      transition: all 0.3s ease;
     }
 
     /* BOTTOM BAR */
@@ -203,12 +201,12 @@
     </div>
   </div>
 
-  <!-- CENTRO: VELOCITÀ -->
+  <!-- CENTRO: VELOCITÀ & DELTA CONSIGLIATO -->
   <div class="speed-display">
     <div class="current-speed" id="gpsSpeed">0</div>
     <div class="speed-unit">KM/H REALI</div>
-    <div class="advised-box">
-      CONSIGLIATA: <span id="advisedSpeed">--</span> KM/H
+    <div class="advised-box" id="advisedBox">
+      IN ATTESA DI PARTENZA
     </div>
   </div>
 
@@ -237,7 +235,7 @@
     // TomTom API Key
     let tomtomApiKey = localStorage.getItem("tomtom_api_key") || "";
 
-    // Telemetria
+    // Telemetria di marcia
     let tripData = [];
     let startTime = null;
     let sampleCount = 0;
@@ -248,13 +246,17 @@
     let lastHeading = null;
     let previousCoord = null;
 
-    // Dati traffico radar
+    // Dati radar
     let radarDistanceM = 9999;
     let radarSpeedKmh = 0;
 
+    // Controllo annunci vocali
+    let lastVoiceNoticeTime = 0;
+    let lastAnnouncedDelta = 0;
+
     // DOM
     const gpsSpeedEl = document.getElementById('gpsSpeed');
-    const advisedSpeedEl = document.getElementById('advisedSpeed');
+    const advisedBoxEl = document.getElementById('advisedBox');
     const speedLimitEl = document.getElementById('speedLimit');
     const statusMsgEl = document.getElementById('statusMsg');
     const sampleCountEl = document.getElementById('sampleCount');
@@ -265,8 +267,35 @@
 
     if (tomtomApiKey) btnKey.classList.add('active');
 
+    // ==========================================
+    // 1. GESTIONE WAKE LOCK BLINDATA (IOS SAFARI)
+    // ==========================================
+    async function requestWakeLock() {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (err) {
+        console.log("WakeLock non disponibile:", err);
+      }
+    }
+
+    // Se l'utente cambia app o l'iPhone si blocca, riaggancia il WakeLock al rientro
+    document.addEventListener('visibilitychange', async () => {
+      if (document.visibilityState === 'visible' && isTracking) {
+        await requestWakeLock();
+      }
+    });
+
+    // Controllo periodico di sicurezza ogni 15 secondi
+    setInterval(async () => {
+      if (isTracking && (!wakeLock || wakeLock.released)) {
+        await requestWakeLock();
+      }
+    }, 15000);
+
     function configuraChiave() {
-      const inserita = prompt("Incolla qui la tua API Key di TomTom (gratuita):", tomtomApiKey);
+      const inserita = prompt("Incolla qui la tua API Key di TomTom:", tomtomApiKey);
       if (inserita !== null) {
         tomtomApiKey = inserita.trim();
         localStorage.setItem("tomtom_api_key", tomtomApiKey);
@@ -288,15 +317,11 @@
       sampleCount = 0;
       stopCount = 0;
       previousCoord = null;
+      lastVoiceNoticeTime = Date.now();
       startTime = new Date();
 
-      try {
-        if ('wakeLock' in navigator) {
-          wakeLock = await navigator.wakeLock.request('screen');
-        }
-      } catch (err) {}
-
-      speak("Radar traffico avviato");
+      await requestWakeLock();
+      speak("Navigatore avviato");
 
       if ("geolocation" in navigator) {
         watchId = navigator.geolocation.watchPosition(
@@ -317,12 +342,17 @@
 
     function stopTripAndExport() {
       if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-      if (wakeLock !== null) wakeLock.release();
+      if (wakeLock !== null) {
+        wakeLock.release().catch(() => {});
+        wakeLock = null;
+      }
       isTracking = false;
 
       btnAction.innerText = "AVVIA VIAGGIO REALE";
       btnAction.className = "btn-main btn-start";
-      statusMsgEl.innerText = "VIAGGIO COMPLETATO. ESPORTAZIONE...";
+      statusMsgEl.innerText = "VIAGGIO COMPLETATO. SALVATAGGIO...";
+      advisedBoxEl.innerText = "VIAGGIO TERMINATO";
+      advisedBoxEl.style.color = "#8E8E93";
 
       esportaCSV();
     }
@@ -335,7 +365,7 @@
       const now = new Date();
       const elapsedSec = Math.round((now - startTime) / 1000);
 
-      // Calcola direzione (heading) dal GPS o dai punti successivi
+      // Calcola direzione (heading) dal GPS o vettore di spostamento
       if (coords.heading !== null && !isNaN(coords.heading) && coords.heading >= 0) {
         lastHeading = coords.heading;
       } else if (previousCoord && speedKmh > 10) {
@@ -349,43 +379,40 @@
       sampleCountEl.innerText = sampleCount;
       stopCountEl.innerText = stopCount;
 
-      // 1. Aggiorna limiti stradali (OSM) ogni 250m
+      // 1. Aggiorna limiti stradali da OpenStreetMap ogni 250 metri
       aggiornaLimiteStradale(lat, lon);
 
-      // 2. Radar Traffico TomTom ogni 25 secondi (se velocità > 30 km/h e abbiamo la direzione)
+      // 2. Radar TomTom ogni 20 secondi se in marcia (> 25 km/h)
       const nowTime = Date.now();
-      if (tomtomApiKey && (nowTime - lastTrafficCheckTime > 25000) && speedKmh > 30 && lastHeading !== null) {
+      if (tomtomApiKey && (nowTime - lastTrafficCheckTime > 20000) && speedKmh > 25 && lastHeading !== null) {
         lastTrafficCheckTime = nowTime;
-        interrogaRadarTraffico(lat, lon, lastHeading);
+        interrogaRadarTraffico(lat, lon, lastHeading, speedKmh);
       }
 
-      // 3. Algoritmo Traffic Smoothing Integrato
-      let targetSpeed = Math.min(speedKmh, currentLimit);
+      // 3. Algoritmo Traffic Smoothing
+      let targetSpeed = currentLimit;
       let stato = "SCORREVOLE";
 
-      if (radarDistanceM <= 2500 && radarSpeedKmh < (currentLimit * 0.45)) {
-        // Coda rilevata a 1.5 - 2.5 km avanti
+      if (radarDistanceM <= 2500 && radarSpeedKmh < (currentLimit * 0.50)) {
         const fattore = Math.max(0.1, radarDistanceM / 2500.0);
         const vCalc = radarSpeedKmh + (currentLimit - radarSpeedKmh) * Math.pow(fattore, 0.8);
-        targetSpeed = Math.max(30, Math.min(Math.round(vCalc), currentLimit));
-        
+        targetSpeed = Math.max(25, Math.min(Math.round(vCalc), currentLimit));
         stato = "DECELERAZIONE";
-        gpsSpeedEl.style.color = "#FFB300";
-        statusMsgEl.style.color = "#FFB300";
         statusMsgEl.innerText = `RALLENTAMENTO A ${radarDistanceM}M (${radarSpeedKmh} KM/H)`;
+        statusMsgEl.style.color = "#FFB300";
       } else if (speedKmh > currentLimit) {
-        gpsSpeedEl.style.color = "#FF3D00";
-        statusMsgEl.style.color = "#FF3D00";
+        stato = "ECCESSO";
         statusMsgEl.innerText = "SUPERAMENTO LIMITE LEGALE";
+        statusMsgEl.style.color = "#FF3D00";
       } else {
-        gpsSpeedEl.style.color = "#00E5FF";
-        statusMsgEl.style.color = "#00E5FF";
         statusMsgEl.innerText = "FLUSSO REGOLARE";
+        statusMsgEl.style.color = "#00E5FF";
       }
 
-      advisedSpeedEl.innerText = targetSpeed;
+      // 4. Aggiorna HUD e Istruzioni Vocali Delta
+      aggiornaIndicazioniDelta(speedKmh, targetSpeed);
 
-      // Salva campione completo
+      // 5. Scrittura Campione
       tripData.push({
         iso: now.toISOString(),
         secondi: elapsedSec,
@@ -405,9 +432,56 @@
       statusMsgEl.style.color = "#FF3D00";
     }
 
-    // Interroga TomTom Flow Segment sul punto proiettato in avanti
-    async function interrogaRadarTraffico(lat, lon, headingDeg) {
-      const distanzaSondaMetri = 1500; // Scandaglia 1.5 km davanti
+    // ==========================================
+    // 2. GESTIONE ISTRUZIONI VOCALI E HUD A DELTA
+    // ==========================================
+    function aggiornaIndicazioniDelta(vReale, vTarget) {
+      const diff = vReale - vTarget; // Positivo = troppo veloce, Negativo = lento
+      const now = Date.now();
+
+      if (diff >= 5) {
+        const delta = Math.round(diff);
+        advisedBoxEl.innerHTML = `RALLENTA DI <span style="color:#FF3D00;">${delta}</span> KM/H`;
+        advisedBoxEl.style.borderColor = "#FF3D00";
+        gpsSpeedEl.style.color = "#FF3D00";
+
+        // Feedback vocale (cooldown di 9 secondi)
+        if (audioEnabled && (now - lastVoiceNoticeTime > 9000)) {
+          if (Math.abs(delta - lastAnnouncedDelta) >= 3 || (now - lastVoiceNoticeTime > 16000)) {
+            speak(`Rallenta di ${delta} all'ora`);
+            lastAnnouncedDelta = delta;
+            lastVoiceNoticeTime = now;
+          }
+        }
+      } else if (diff <= -8 && vReale > 18) {
+        // Accelera solo se già in marcia (> 18 km/h), mai da fermi al semaforo
+        const delta = Math.round(Math.abs(diff));
+        advisedBoxEl.innerHTML = `ACCELERA DI <span style="color:#00E5FF;">${delta}</span> KM/H`;
+        advisedBoxEl.style.borderColor = "#00E5FF";
+        gpsSpeedEl.style.color = "#00E5FF";
+
+        if (audioEnabled && (now - lastVoiceNoticeTime > 9000)) {
+          if (Math.abs(delta - lastAnnouncedDelta) >= 3 || (now - lastVoiceNoticeTime > 16000)) {
+            speak(`Accelera di ${delta} all'ora`);
+            lastAnnouncedDelta = delta;
+            lastVoiceNoticeTime = now;
+          }
+        }
+      } else {
+        // Velocità ottimale
+        advisedBoxEl.innerHTML = `VELOCITÀ OTTIMALE (<span style="color:#00E676;">${vTarget}</span>)`;
+        advisedBoxEl.style.borderColor = "#00E676";
+        gpsSpeedEl.style.color = "#00E676";
+        lastAnnouncedDelta = 0;
+      }
+    }
+
+    // ==========================================
+    // 3. RADAR TRAFFICO CON SONDA ADATTIVA
+    // ==========================================
+    async function interrogaRadarTraffico(lat, lon, headingDeg, speedKmh) {
+      // Sonda breve (600m) in città/extraurbano, 1500m in autostrada
+      const distanzaSondaMetri = speedKmh > 75 ? 1500 : 600;
       const sonda = proiettaCoordinate(lat, lon, distanzaSondaMetri, headingDeg);
       
       const url = `https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json?point=${sonda.lat},${sonda.lon}&key=${tomtomApiKey}`;
@@ -421,12 +495,10 @@
           const vAttuale = data.flowSegmentData.currentSpeed;
           const vLibera = data.flowSegmentData.freeFlowSpeed;
 
-          // Se la velocità avanti è meno della metà della velocità libera, c'è traffico
           if (vAttuale < (vLibera * 0.55)) {
             radarDistanceM = distanzaSondaMetri;
             radarSpeedKmh = vAttuale;
             radarStatusEl.innerText = `CODA (${vAttuale}km/h)`;
-            if (audioEnabled) speak(`Rallentamento avanti. Mantieni ${vAttuale + 15} all'ora.`);
           } else {
             radarDistanceM = 9999;
             radarStatusEl.innerText = "LIBERO";
@@ -437,7 +509,6 @@
       }
     }
 
-    // Proiezione geometrica sferica (Geodesica)
     function proiettaCoordinate(lat, lon, distanzaM, bearingDeg) {
       const R = 6371000;
       const d = distanzaM / R;
@@ -461,7 +532,9 @@
       return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
     }
 
-    // Limiti Stradali OSM
+    // ==========================================
+    // 4. LIMITI STRADALI OPENSTREETMAP (CORRETTO)
+    // ==========================================
     async function aggiornaLimiteStradale(lat, lon) {
       if (lastQueryPos) {
         const d = distanzaMetri(lastQueryPos.lat, lastQueryPos.lon, lat, lon);
@@ -469,7 +542,8 @@
       }
       lastQueryPos = { lat, lon };
 
-      const query = `[out:json][timeout:3];way(around:35,${lat},{lon})[highway];out tags;`;
+      // Corretto: aggiunto il simbolo $ davanti a {lon}
+      const query = `[out:json][timeout:3];way(around:35,${lat},${lon})[highway];out tags;`;
       try {
         const res = await fetch("https://overpass-api.de/api/interpreter", {
           method: "POST",
@@ -499,7 +573,6 @@
       if (nuovoLimite !== currentLimit) {
         currentLimit = nuovoLimite;
         speedLimitEl.innerText = currentLimit;
-        if (audioEnabled) speak("Limite " + currentLimit);
       }
     }
 
@@ -518,7 +591,7 @@
       window.speechSynthesis.cancel();
       const ut = new SpeechSynthesisUtterance(text);
       ut.lang = 'it-IT';
-      ut.rate = 1.1;
+      ut.rate = 1.05;
       window.speechSynthesis.speak(ut);
     }
 
