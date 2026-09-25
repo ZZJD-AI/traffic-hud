@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="HUD Speed">
 
-  <title>HUD Speed & Coasting Radar</title>
+  <title>HUD Traffic Flow Advisor</title>
   <style>
     * {
       box-sizing: border-box;
@@ -53,8 +53,8 @@
       max-width: 500px;
     }
     .speed-limit-badge {
-      width: 58px;
-      height: 58px;
+      width: 56px;
+      height: 56px;
       border-radius: 50%;
       background-color: #FFFFFF;
       border: 5px solid #D50000;
@@ -62,7 +62,7 @@
       justify-content: center;
       align-items: center;
       color: #000000;
-      font-size: 24px;
+      font-size: 22px;
       font-weight: 900;
       box-shadow: 0 0 10px rgba(255,255,255,0.2);
     }
@@ -85,7 +85,7 @@
       border-color: #00E5FF;
     }
 
-    /* CENTRO: VELOCITÀ & SMOOTHING GAUGE */
+    /* CENTRO: VELOCITÀ & FLUSSO REALE */
     .speed-display {
       flex: 1;
       display: flex;
@@ -130,7 +130,7 @@
       margin-top: 8px;
     }
 
-    /* BARRA ZONA SMOOTHING */
+    /* BARRA ZONA FLUSSO */
     .smoothing-bar-container {
       width: 80%;
       height: 6px;
@@ -148,7 +148,7 @@
       left: 40%;
       background-color: #00E676;
       border-radius: 4px;
-      transition: all 0.25s ease-out;
+      transition: all 0.3s ease-out;
     }
 
     .advised-box {
@@ -307,7 +307,7 @@
     </div>
   </div>
 
-  <!-- CENTRO: VELOCITÀ & SMOOTHING -->
+  <!-- CENTRO: VELOCITÀ & FLUSSO REALE -->
   <div class="speed-display">
     <div class="coasting-banner" id="coastingBanner">VELEGGIA / RILASCIA</div>
     <div class="current-speed" id="gpsSpeed">0</div>
@@ -329,7 +329,7 @@
       <div class="telemetry-mini">
         <span>Campioni: <b id="sampleCount">0</b></span>
         <span>Stops: <b id="stopCount">0</b></span>
-        <span>Radar: <b id="radarStatus">OFF</b></span>
+        <span>Flusso TomTom: <b id="radarStatus">--</b></span>
       </div>
     </div>
     
@@ -391,8 +391,10 @@
     let lastHeading = null;
     let previousCoord = null;
 
-    let radarDistanceM = 9999;
-    let radarSpeedKmh = 0;
+    // Dati traffico e flusso reale TomTom
+    let liveFlowSpeed = null;      // Velocità reale del segmento TomTom
+    let liveFreeFlowSpeed = null;  // Velocità teorica a strada libera
+    let trafficLevel = "NORMALE";   // LIBERO, NORMALE, DENSO, CODA
     let isCoasting = false;
 
     let lastVoiceNoticeTime = 0;
@@ -416,7 +418,7 @@
     if (tomtomApiKey) btnKey.classList.add('active');
 
     // ==========================================
-    // 1. SINTETIZZATORE AUDIO (WEB AUDIO CHIMES)
+    // 1. SINTETIZZATORE AUDIO (CHIMES)
     // ==========================================
     let audioCtx = null;
     function initAudioContext() {
@@ -438,42 +440,23 @@
       gain.connect(audioCtx.destination);
 
       if (type === 'coast') {
-        // Tono morbido discendente (Invito a veleggiare)
-        osc.frequency.setValueAtTime(587.33, now); // Re5
-        osc.frequency.exponentialRampToValueAtTime(392.00, now + 0.3); // Sol4
+        osc.frequency.setValueAtTime(587.33, now);
+        osc.frequency.exponentialRampToValueAtTime(392.00, now + 0.3);
         gain.gain.setValueAtTime(0.2, now);
         gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
         osc.start(now);
         osc.stop(now + 0.35);
       } else if (type === 'warn') {
-        // Doppio bip di allarme (Coda improvvisa o eccesso netto)
-        osc.frequency.setValueAtTime(493.88, now); // Si4
+        osc.frequency.setValueAtTime(493.88, now);
         gain.gain.setValueAtTime(0.25, now);
         gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
         osc.start(now);
         osc.stop(now + 0.12);
-
-        const osc2 = audioCtx.createOscillator();
-        const gain2 = audioCtx.createGain();
-        osc2.connect(gain2);
-        gain2.connect(audioCtx.destination);
-        osc2.frequency.setValueAtTime(392.00, now + 0.15); // Sol4
-        gain2.gain.setValueAtTime(0.25, now + 0.15);
-        gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.28);
-        osc2.start(now + 0.15);
-        osc2.stop(now + 0.28);
-      } else if (type === 'optimal') {
-        // Ping delicato (Rientrato nella finestra perfetta)
-        osc.frequency.setValueAtTime(523.25, now); // Do5
-        gain.gain.setValueAtTime(0.12, now);
-        gain.gain.exponentialRampToValueAtTime(0.005, now + 0.18);
-        osc.start(now);
-        osc.stop(now + 0.18);
       }
     }
 
     // ==========================================
-    // 2. WAKE LOCK RE-ENGAGE BLINDATO PER IOS
+    // 2. WAKE LOCK RE-ENGAGE PER IPHONE
     // ==========================================
     async function requestWakeLock() {
       try {
@@ -518,12 +501,14 @@
       sampleCount = 0;
       stopCount = 0;
       previousCoord = null;
+      liveFlowSpeed = null;
+      liveFreeFlowSpeed = null;
       startTime = new Date();
       lastVoiceNoticeTime = Date.now();
       lastChimeTime = Date.now();
 
       await requestWakeLock();
-      speak("Radar traffico avviato");
+      speak("Monitoraggio flusso avviato");
 
       if ("geolocation" in navigator) {
         watchId = navigator.geolocation.watchPosition(
@@ -559,7 +544,7 @@
     }
 
     // ==========================================
-    // 3. LOGICA PRINCIPALE TELEMETRIA & COASTING
+    // 3. LOGICA PRINCIPALE & VELOCITÀ DI FLUSSO
     // ==========================================
     function onGpsSuccess(pos) {
       const coords = pos.coords;
@@ -584,48 +569,49 @@
 
       aggiornaLimiteStradale(lat, lon);
 
-      // Radar TomTom adattivo ogni 20 secondi
+      // Radar TomTom adattivo ogni 18 secondi se in marcia
       const nowTime = Date.now();
-      if (tomtomApiKey && (nowTime - lastTrafficCheckTime > 20000) && speedKmh > 25 && lastHeading !== null) {
+      if (tomtomApiKey && (nowTime - lastTrafficCheckTime > 18000) && speedKmh > 20 && lastHeading !== null) {
         lastTrafficCheckTime = nowTime;
         interrogaRadarTraffico(lat, lon, lastHeading, speedKmh);
       }
 
-      // Algoritmo Smoothing & Calcolo Target
+      // ========================================================
+      // CALCOLO CROCIERA DEL FLUSSO (TARGET INTELIGENTE)
+      // ========================================================
       let targetSpeed = currentLimit;
-      let stato = "SCORREVOLE";
+      
+      // Se TomTom fornisce la velocità reale del segmento, usiamo quella come crociera!
+      if (liveFlowSpeed !== null && liveFlowSpeed > 0) {
+        // La crociera ideale è il flusso reale, con tetto al limite di legge
+        targetSpeed = Math.min(liveFlowSpeed, currentLimit);
+      }
+
       isCoasting = false;
+      let stato = "SCORREVOLE";
 
-      if (radarDistanceM <= 2500 && radarSpeedKmh < (currentLimit * 0.50)) {
-        const fattore = Math.max(0.1, radarDistanceM / 2500.0);
-        const vCalc = radarSpeedKmh + (currentLimit - radarSpeedKmh) * Math.pow(fattore, 0.8);
-        targetSpeed = Math.max(25, Math.min(Math.round(vCalc), currentLimit));
+      // Verifica se il veicolo deve veleggiare (flusso in rallentamento marcato)
+      if (liveFlowSpeed !== null && liveFlowSpeed < (currentLimit * 0.65) && speedKmh > (liveFlowSpeed + 8)) {
+        isCoasting = true;
         stato = "DECELERAZIONE";
-        
-        // Attiva Coasting se siamo oltre 10 km/h sopra la velocità della coda
-        if (speedKmh > targetSpeed + 8) {
-          isCoasting = true;
-        }
-
-        statusMsgEl.innerText = `RALLENTAMENTO A ${radarDistanceM}M (${radarSpeedKmh} KM/H)`;
+        statusMsgEl.innerText = `FLUSSO RALLENTATO A ${liveFlowSpeed} KM/H`;
         statusMsgEl.style.color = "#FFB300";
-      } else if (speedKmh > currentLimit) {
+      } else if (speedKmh > currentLimit + 4) {
         stato = "ECCESSO";
         statusMsgEl.innerText = "SUPERAMENTO LIMITE LEGALE";
         statusMsgEl.style.color = "#FF3D00";
       } else {
-        statusMsgEl.innerText = "FLUSSO REGOLARE";
+        statusMsgEl.innerText = `FLUSSO REGOLARE (${trafficLevel})`;
         statusMsgEl.style.color = "#00E5FF";
       }
 
-      // Aggiorna indicatore Coasting Banner
       if (isCoasting) {
         coastingBannerEl.style.display = "block";
       } else {
         coastingBannerEl.style.display = "none";
       }
 
-      aggiornaIndicazioniDelta(speedKmh, targetSpeed, isCoasting);
+      aggiornaIndicazioniFlusso(speedKmh, targetSpeed, isCoasting);
 
       tripData.push({
         iso: now.toISOString(),
@@ -634,10 +620,10 @@
         lon: lon.toFixed(6),
         speed: speedKmh,
         limite: currentLimit,
+        velocita_flusso_tomtom: liveFlowSpeed !== null ? liveFlowSpeed : "N/D",
         target: targetSpeed,
         coasting: isCoasting ? 1 : 0,
-        coda_dist_m: radarDistanceM < 9000 ? radarDistanceM : "Nessuna",
-        coda_vel_kmh: radarDistanceM < 9000 ? radarSpeedKmh : "N/A",
+        livello_traffico: trafficLevel,
         stato: stato
       });
     }
@@ -648,19 +634,19 @@
     }
 
     // ==========================================
-    // 4. FEEDBACK GRAFICO, BARRA & SEGNALI AUDIO
+    // 4. FEEDBACK GRAFICO & AUDIO (NO ACCELERA!)
     // ==========================================
-    function aggiornaIndicazioniDelta(vReale, vTarget, coastingAttivo) {
+    function aggiornaIndicazioniFlusso(vReale, vTarget, coastingAttivo) {
       const diff = vReale - vTarget;
       const now = Date.now();
 
-      // Posizionamento cursore barra orizzontale (-25 km/h a +25 km/h centrata al 40%)
+      // Indicatore su barra grafica (centrato su 0 di scarto)
       const clampDiff = Math.max(-25, Math.min(25, diff));
       const leftPercent = 40 + (clampDiff / 25) * 40;
       smoothingIndicatorEl.style.left = `${leftPercent}%`;
 
       if (coastingAttivo) {
-        advisedBoxEl.innerHTML = `VELEGGIA &rarr; TARGET <span style="color:#FFB300;">${vTarget}</span> KM/H`;
+        advisedBoxEl.innerHTML = `VELEGGIA &rarr; FLUSSO A <span style="color:#FFB300;">${vTarget}</span> KM/H`;
         advisedBoxEl.style.borderColor = "#FF9100";
         smoothingIndicatorEl.style.backgroundColor = "#FF9100";
         gpsSpeedEl.style.color = "#FFB300";
@@ -669,37 +655,25 @@
           playChime('coast');
           lastChimeTime = now;
         }
-      } else if (diff >= 5) {
-        const delta = Math.round(diff);
-        advisedBoxEl.innerHTML = `RALLENTA DI <span style="color:#FF3D00;">${delta}</span> KM/H`;
+      } else if (vReale > currentLimit + 4) {
+        // Unico caso di avviso vocale di rallentamento: vero eccesso sul limite di legge
+        const delta = Math.round(vReale - currentLimit);
+        advisedBoxEl.innerHTML = `LIMITE SUPERATO &rarr; <span style="color:#FF3D00;">${currentLimit}</span> KM/H`;
         advisedBoxEl.style.borderColor = "#FF3D00";
         smoothingIndicatorEl.style.backgroundColor = "#FF3D00";
         gpsSpeedEl.style.color = "#FF3D00";
 
-        if (audioEnabled && (now - lastVoiceNoticeTime > 9000)) {
-          if (Math.abs(delta - lastAnnouncedDelta) >= 3 || (now - lastVoiceNoticeTime > 16000)) {
-            if (delta >= 15) playChime('warn');
-            speak(`Rallenta di ${delta} all'ora`);
-            lastAnnouncedDelta = delta;
-            lastVoiceNoticeTime = now;
-          }
-        }
-      } else if (diff <= -8 && vReale > 18) {
-        const delta = Math.round(Math.abs(diff));
-        advisedBoxEl.innerHTML = `ACCELERA DI <span style="color:#00E5FF;">${delta}</span> KM/H`;
-        advisedBoxEl.style.borderColor = "#00E5FF";
-        smoothingIndicatorEl.style.backgroundColor = "#00E5FF";
-        gpsSpeedEl.style.color = "#00E5FF";
-
-        if (audioEnabled && (now - lastVoiceNoticeTime > 9000)) {
-          if (Math.abs(delta - lastAnnouncedDelta) >= 3 || (now - lastVoiceNoticeTime > 16000)) {
-            speak(`Accelera di ${delta} all'ora`);
+        if (audioEnabled && (now - lastVoiceNoticeTime > 12000)) {
+          if (Math.abs(delta - lastAnnouncedDelta) >= 3 || (now - lastVoiceNoticeTime > 18000)) {
+            speak(`Limite ${currentLimit}`);
             lastAnnouncedDelta = delta;
             lastVoiceNoticeTime = now;
           }
         }
       } else {
-        advisedBoxEl.innerHTML = `VELOCITÀ OTTIMALE (<span style="color:#00E676;">${vTarget}</span>)`;
+        // Andatura corretta: NESSUN ORDINE DI ACCELERARE!
+        // Mostra semplicemente la velocità di crociera del flusso
+        advisedBoxEl.innerHTML = `CROCIERA FLUSSO: <span style="color:#00E676;">${vTarget}</span> KM/H`;
         advisedBoxEl.style.borderColor = "#00E676";
         smoothingIndicatorEl.style.backgroundColor = "#00E676";
         gpsSpeedEl.style.color = "#00E676";
@@ -708,29 +682,33 @@
     }
 
     // ==========================================
-    // 5. RADAR TRAFFICO & LIMITI STRADALI
+    // 5. RADAR TOMTOM (FLUSSO REALE & DENSITÀ)
     // ==========================================
     async function interrogaRadarTraffico(lat, lon, headingDeg, speedKmh) {
-      const distanzaSondaMetri = speedKmh > 75 ? 1500 : 600;
+      // Sonda proporzionata: 500m in città, 1200m a velocità sostenuta
+      const distanzaSondaMetri = speedKmh > 70 ? 1200 : 500;
       const sonda = proiettaCoordinate(lat, lon, distanzaSondaMetri, headingDeg);
       const url = `https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json?point=${sonda.lat},${sonda.lon}&key=${tomtomApiKey}`;
 
       try {
-        radarStatusEl.innerText = "SCANSIONE...";
         const res = await fetch(url);
         const data = await res.json();
 
         if (data && data.flowSegmentData) {
-          const vAttuale = data.flowSegmentData.currentSpeed;
-          const vLibera = data.flowSegmentData.freeFlowSpeed;
+          liveFlowSpeed = data.flowSegmentData.currentSpeed;
+          liveFreeFlowSpeed = data.flowSegmentData.freeFlowSpeed;
 
-          if (vAttuale < (vLibera * 0.55)) {
-            radarDistanceM = distanzaSondaMetri;
-            radarSpeedKmh = vAttuale;
-            radarStatusEl.innerText = `CODA (${vAttuale}km/h)`;
+          // Calcola il livello di densità del flusso
+          const ratio = liveFlowSpeed / Math.max(1, liveFreeFlowSpeed);
+          if (ratio >= 0.85) {
+            trafficLevel = "LIBERO";
+            radarStatusEl.innerText = `${liveFlowSpeed} km/h (Libero)`;
+          } else if (ratio >= 0.60) {
+            trafficLevel = "MODERATO";
+            radarStatusEl.innerText = `${liveFlowSpeed} km/h (Denso)`;
           } else {
-            radarDistanceM = 9999;
-            radarStatusEl.innerText = "LIBERO";
+            trafficLevel = "RALLENTATO";
+            radarStatusEl.innerText = `${liveFlowSpeed} km/h (Coda)`;
           }
         }
       } catch (err) {
@@ -738,6 +716,9 @@
       }
     }
 
+    // ==========================================
+    // 6. LIMITI STRADALI OPENSTREETMAP
+    // ==========================================
     async function aggiornaLimiteStradale(lat, lon) {
       if (lastQueryPos) {
         const d = distanzaMetri(lastQueryPos.lat, lastQueryPos.lon, lat, lon);
@@ -754,7 +735,7 @@
         const data = await res.json();
         const fallback = {
           "motorway": 130, "trunk": 110, "primary": 90,
-          "secondary": 90, "residential": 50, "living_street": 30
+          "secondary": 90, "tertiary": 50, "residential": 50, "unclassified": 50, "living_street": 30
         };
 
         for (const el of data.elements || []) {
@@ -779,7 +760,7 @@
     }
 
     // ==========================================
-    // 6. REPORT DI EFFICIENZA POST-VIAGGIO
+    // 7. REPORT DI EFFICIENZA
     // ==========================================
     function mostraReportEfficienza() {
       if (tripData.length < 5) return;
@@ -788,7 +769,7 @@
       let totalSpeed = 0;
       let stopsCount = 0;
       let deltaEkJoules = 0;
-      const m = 1400; // Massa media veicolo (kg)
+      const m = 1400;
 
       for (let i = 1; i < tripData.length; i++) {
         const p1 = tripData[i-1];
@@ -803,7 +784,6 @@
         const v1_ms = p1.speed / 3.6;
         const v2_ms = p2.speed / 3.6;
         if (v2_ms < v1_ms) {
-          // Energia cinetica dissipata in decelerazione
           deltaEkJoules += 0.5 * m * (Math.pow(v1_ms, 2) - Math.pow(v2_ms, 2));
         }
       }
@@ -811,10 +791,8 @@
       const avgSpeedKmh = Math.round(totalSpeed / tripData.length);
       const distKm = (totalDistM / 1000).toFixed(2);
       const deltaEkMj = (deltaEkJoules / 1e6).toFixed(2);
-      // Carburante stimato (rendimento termico ~28%, potere calorifico 33 MJ/litro)
       const fuelLiters = (deltaEkJoules / (33e6 * 0.28)).toFixed(2);
 
-      // Score di fluidità (0-100): penalizzato da frenate frequenti e arresti
       let score = Math.round(100 - (stopsCount * 4.5) - (deltaEkMj * 4.0 / Math.max(1, distKm)));
       score = Math.max(15, Math.min(98, score));
 
@@ -832,7 +810,6 @@
       reportModal.style.display = 'none';
     }
 
-    // Geodesica e Utilità
     function proiettaCoordinate(lat, lon, distanzaM, bearingDeg) {
       const R = 6371000;
       const d = distanzaM / R;
@@ -885,16 +862,16 @@
     function esportaCSV() {
       if (tripData.length === 0) return;
 
-      let csvContent = "timestamp_iso,secondi_trascorsi,latitudine,longitudine,velocita_gps_kmh,limite_vigente_kmh,velocita_consigliata_kmh,coasting_attivo,distanza_coda_m,velocita_coda_kmh,stato\n";
+      let csvContent = "timestamp_iso,secondi_trascorsi,latitudine,longitudine,velocita_gps_kmh,limite_vigente_kmh,velocita_flusso_tomtom,velocita_consigliata_kmh,coasting_attivo,livello_traffico,stato\n";
       tripData.forEach(row => {
-        csvContent += `${row.iso},${row.secondi},${row.lat},${row.lon},${row.speed},${row.limite},${row.target},${row.coasting},${row.coda_dist_m},${row.coda_vel_kmh},${row.stato}\n`;
+        csvContent += `${row.iso},${row.secondi},${row.lat},${row.lon},${row.speed},${row.limite},${row.velocita_flusso_tomtom},${row.target},${row.coasting},${row.livello_traffico},${row.stato}\n`;
       });
 
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       const d = new Date();
-      const filename = `viaggio_radar_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}.csv`;
+      const filename = `viaggio_flusso_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}.csv`;
 
       link.setAttribute("href", url);
       link.setAttribute("download", filename);
