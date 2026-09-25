@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Traffic Pacer">
 
-  <title>HUD Traffic Flow & Debug Pacer</title>
+  <title>HUD Traffic Flow & Kinetic Pacer</title>
   <style>
     * {
       box-sizing: border-box;
@@ -43,6 +43,24 @@
     body.mirrored {
       transform: scaleX(-1);
     }
+
+    /* MODALITÀ HUD PROIEZIONE PARABREZZA (ALTO CONTRASTO OLED) */
+    body.hud-night {
+      background-color: #000000 !important;
+    }
+    body.hud-night .top-bar .controls .btn,
+    body.hud-night .status-card,
+    body.hud-night .my-speed-box {
+      border-color: #111111;
+      background-color: transparent;
+    }
+    body.hud-night .speed-limit-badge {
+      border-color: #FF1744;
+      box-shadow: none;
+    }
+    body.hud-night .target-speed-val {
+      text-shadow: 0 0 20px rgba(0, 230, 118, 0.4);
+    }
     
     /* TOP BAR */
     .top-bar {
@@ -68,13 +86,13 @@
     }
     .controls {
       display: flex;
-      gap: 6px;
+      gap: 5px;
     }
     .btn {
       background-color: #1C1C1E;
       border: 1px solid #3A3A3C;
       color: #8E8E93;
-      padding: 8px 10px;
+      padding: 7px 9px;
       border-radius: 8px;
       font-size: 11px;
       font-weight: 700;
@@ -85,7 +103,7 @@
       border-color: #00E5FF;
     }
 
-    /* CENTRO: FLUSSO IN PRIMO PIANO */
+    /* CENTRO: FLUSSO & ONDA VERDE */
     .speed-display {
       flex: 1;
       display: flex;
@@ -100,14 +118,15 @@
       background-color: #121212;
       border: 2px solid #242424;
       color: #00E5FF;
-      padding: 8px 24px;
+      padding: 7px 22px;
       border-radius: 24px;
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 900;
-      letter-spacing: 1.5px;
-      margin-bottom: 12px;
+      letter-spacing: 1.2px;
+      margin-bottom: 10px;
       text-transform: uppercase;
       transition: all 0.3s ease;
+      text-align: center;
     }
     .action-banner.coasting {
       background-color: rgba(255, 145, 0, 0.2);
@@ -120,14 +139,29 @@
       border-color: #FF3D00;
       color: #FF3D00;
     }
+    .action-banner.greenwave {
+      background-color: rgba(0, 230, 118, 0.2);
+      border-color: #00E676;
+      color: #00E676;
+    }
+    .action-banner.hardbrake {
+      background-color: rgba(213, 0, 0, 0.35);
+      border-color: #FF1744;
+      color: #FF1744;
+      animation: blink 0.4s 3 alternate;
+    }
     @keyframes pulse {
       from { opacity: 0.75; transform: scale(0.98); }
       to { opacity: 1; transform: scale(1.02); }
     }
+    @keyframes blink {
+      from { opacity: 0.3; }
+      to { opacity: 1; }
+    }
 
     .target-label {
       color: #8E8E93;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 800;
       letter-spacing: 2px;
       text-transform: uppercase;
@@ -135,7 +169,7 @@
     }
 
     .target-speed-val {
-      font-size: clamp(95px, 32vw, 155px);
+      font-size: clamp(92px, 32vw, 150px);
       font-weight: 900;
       line-height: 0.88;
       color: #00E676;
@@ -146,7 +180,7 @@
     }
     .speed-unit {
       color: #636366;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 800;
       letter-spacing: 3px;
       margin-top: 6px;
@@ -157,7 +191,7 @@
       height: 6px;
       background-color: #242426;
       border-radius: 4px;
-      margin-top: 14px;
+      margin-top: 12px;
       position: relative;
       overflow: hidden;
     }
@@ -173,12 +207,12 @@
     }
 
     .my-speed-box {
-      margin-top: 14px;
+      margin-top: 12px;
       padding: 6px 18px;
       border-radius: 18px;
       background-color: #121212;
       border: 1px solid #242424;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 800;
       letter-spacing: 0.5px;
       color: #8E8E93;
@@ -187,14 +221,14 @@
     .my-speed-box span {
       color: #FFFFFF;
       font-weight: 900;
-      font-size: 15px;
+      font-size: 14px;
     }
 
     /* BOTTOM BAR */
     .bottom-bar {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
       width: 100%;
       max-width: 500px;
     }
@@ -202,20 +236,20 @@
       background-color: #121212;
       border: 1px solid #242424;
       border-radius: 12px;
-      padding: 10px 14px;
+      padding: 9px 12px;
       text-align: center;
     }
     .status-msg {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 800;
       letter-spacing: 0.5px;
       color: #00E5FF;
-      margin-bottom: 4px;
+      margin-bottom: 3px;
     }
     .telemetry-mini {
       display: flex;
       justify-content: space-around;
-      font-size: 11px;
+      font-size: 10.5px;
       color: #636366;
     }
     .telemetry-mini b {
@@ -223,7 +257,7 @@
     }
     .btn-main {
       width: 100%;
-      padding: 15px;
+      padding: 14px;
       border-radius: 12px;
       font-size: 15px;
       font-weight: 800;
@@ -247,14 +281,14 @@
       left: 0;
       width: 100vw;
       height: 100dvh;
-      background: rgba(0, 0, 0, 0.88);
+      background: rgba(0, 0, 0, 0.9);
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
       z-index: 100;
       flex-direction: column;
       justify-content: center;
       align-items: center;
-      padding: 24px;
+      padding: 20px;
     }
     .report-card {
       background-color: #151518;
@@ -262,61 +296,61 @@
       border-radius: 20px;
       width: 100%;
       max-width: 440px;
-      padding: 24px;
+      padding: 22px;
       text-align: center;
     }
     .report-title {
-      font-size: 20px;
+      font-size: 19px;
       font-weight: 900;
       color: #00E5FF;
-      margin-bottom: 6px;
+      margin-bottom: 4px;
     }
     .report-score {
-      font-size: 54px;
+      font-size: 52px;
       font-weight: 900;
       color: #00E676;
       line-height: 1;
-      margin: 14px 0 6px 0;
+      margin: 12px 0 4px 0;
     }
     .report-score-sub {
-      font-size: 12px;
+      font-size: 11px;
       color: #8E8E93;
       text-transform: uppercase;
       letter-spacing: 1px;
-      margin-bottom: 18px;
+      margin-bottom: 16px;
     }
     .report-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 12px;
+      gap: 10px;
       text-align: left;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
     }
     .report-item {
       background: #1E1E22;
       border-radius: 12px;
-      padding: 10px 14px;
+      padding: 9px 12px;
     }
     .report-label {
-      font-size: 11px;
+      font-size: 10.5px;
       color: #8E8E93;
       text-transform: uppercase;
     }
     .report-val {
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 800;
       color: #FFFFFF;
       margin-top: 2px;
     }
     .learned-info {
-      font-size: 12px;
+      font-size: 11.5px;
       color: #00E5FF;
-      margin-bottom: 16px;
+      margin-bottom: 14px;
       font-weight: 700;
     }
     .btn-close {
       width: 100%;
-      padding: 14px;
+      padding: 13px;
       background-color: #2C2C30;
       border: none;
       border-radius: 12px;
@@ -335,15 +369,16 @@
     <div class="controls">
       <button class="btn" id="btnKey" onclick="configuraChiave()">API KEY</button>
       <button class="btn" id="btnAudio" onclick="toggleAudio()">AUDIO: ON</button>
-      <button class="btn" id="btnMirror" onclick="toggleMirror()">HUD</button>
+      <button class="btn" id="btnMirror" onclick="toggleMirror()">HUD MIRROR</button>
+      <button class="btn" id="btnNight" onclick="toggleNightHUD()">NOTTE</button>
     </div>
   </div>
 
-  <!-- CENTRO: CROCIERA DEL FLUSSO -->
+  <!-- CENTRO: VELOCITÀ & TARGET -->
   <div class="speed-display">
     <div class="action-banner" id="actionBanner">IN ATTESA DI PARTENZA</div>
     
-    <div class="target-label">Velocità Flusso Consigliata</div>
+    <div class="target-label" id="targetLabel">Velocità Flusso Consigliata</div>
     <div class="target-speed-val" id="targetSpeedVal">--</div>
     <div class="speed-unit">KM/H TARGET</div>
     
@@ -352,7 +387,7 @@
     </div>
 
     <div class="my-speed-box" id="mySpeedBox">
-      Tua Velocità: <span id="gpsSpeed">0</span> km/h
+      Tua Velocità: <span id="gpsSpeed">0</span> km/h | Pendenza: <span id="slopeDisp">0%</span>
     </div>
   </div>
 
@@ -364,6 +399,7 @@
         <span>Campioni: <b id="sampleCount">0</b></span>
         <span>TomTom: <b id="radarStatus">--</b></span>
         <span>Memoria: <b id="dbStatus">0 sett.</b></span>
+        <span>Frenate: <b id="harshBrakesCount">0</b></span>
       </div>
     </div>
     
@@ -393,16 +429,20 @@
           <div class="report-val" id="repStops">--</div>
         </div>
         <div class="report-item">
+          <div class="report-label">Frenate Brusche</div>
+          <div class="report-val" id="repHarshBrakes" style="color: #FF1744;">--</div>
+        </div>
+        <div class="report-item">
           <div class="report-label">Energia Freni</div>
           <div class="report-val" id="repEnergy">-- MJ</div>
         </div>
-        <div class="report-item" style="grid-column: span 2;">
-          <div class="report-label">Carburante Dissipato nei Freni</div>
-          <div class="report-val" id="repFuel" style="color: #FFB300;">-- Litri</div>
+        <div class="report-item">
+          <div class="report-label">Carburante Perso</div>
+          <div class="report-val" id="repFuel" style="color: #FFB300;">-- L</div>
         </div>
       </div>
 
-      <div class="learned-info" id="repLearned">Aggiornamento pattern stradali completato...</div>
+      <div class="learned-info" id="repLearned">Pattern stradali registrati.</div>
       <button class="btn-close" onclick="chiudiReport()">CHIUDI E TORNA ALL'HUD</button>
     </div>
   </div>
@@ -420,21 +460,26 @@
     let startTime = null;
     let sampleCount = 0;
     let stopCount = 0;
+    let harshBrakesCount = 0;
     let currentLimit = 50;
     let lastQueryPos = null;
     let lastTrafficCheckTime = 0;
     let lastDbCheckTime = 0;
     let lastHeading = null;
     let previousCoord = null;
+    let previousSpeedKmh = 0;
+    let previousAltitude = null;
+    let currentSlopePerc = 0;
 
-    // Traffico live e memoria storica
+    // Traffico live, Onda Verde e Memoria Storica
     let liveFlowSpeed = null;
     let liveFreeFlowSpeed = null;
     let histLearnedSpeed = null;
-    let trafficLevel = "NORMALE";
+    let histStopProbability = 0;
+    let greenWaveTarget = null;
     let isCoasting = false;
 
-    // VARIABILI DEBUG & DIAGNOSTICA
+    // Diagnostica e Debug
     let dbgTomTomStatus = "STANDBY";
     let dbgTomTomLatencyMs = 0;
     let dbgProbeDistM = 0;
@@ -442,14 +487,18 @@
     let dbgProbeLon = "N/D";
     let dbgOsmStatus = "STANDBY";
     let dbgOsmType = "INIT";
+    let dbgOsmDiffDeg = "N/D";
     let dbgDbStatus = "STANDBY";
     let dbgSectorId = "N/D";
+    let dbgDecelMs2 = 0;
+    let dbgHarshBrakeFlag = 0;
 
     let lastVoiceNoticeTime = 0;
     let lastChimeTime = 0;
 
     // DOM
     const gpsSpeedEl = document.getElementById('gpsSpeed');
+    const slopeDispEl = document.getElementById('slopeDisp');
     const targetSpeedValEl = document.getElementById('targetSpeedVal');
     const actionBannerEl = document.getElementById('actionBanner');
     const mySpeedBoxEl = document.getElementById('mySpeedBox');
@@ -458,6 +507,7 @@
     const sampleCountEl = document.getElementById('sampleCount');
     const radarStatusEl = document.getElementById('radarStatus');
     const dbStatusEl = document.getElementById('dbStatus');
+    const harshBrakesCountEl = document.getElementById('harshBrakesCount');
     const smoothingIndicatorEl = document.getElementById('smoothingIndicator');
     const btnAction = document.getElementById('btnAction');
     const btnKey = document.getElementById('btnKey');
@@ -468,7 +518,7 @@
     // ==========================================
     // 1. MOTORE APPRENDIMENTO LOCALE (INDEXEDDB)
     // ==========================================
-    const DB_NAME = "TrafficLearningDB";
+    const DB_NAME = "TrafficLearningDB_v2";
     const DB_VERSION = 1;
     let dbInstance = null;
 
@@ -499,11 +549,8 @@
       return `${latGrid}_${lonGrid}_${isWeekend}_${h}:${mSlot}`;
     }
 
-    async function leggiVelocitaStorica(lat, lon) {
-      if (!dbInstance) {
-        dbgDbStatus = "NO_INSTANCE";
-        return null;
-      }
+    async function leggiSettoreStorico(lat, lon) {
+      if (!dbInstance) return null;
       const id = generaIdSettore(lat, lon, new Date());
       dbgSectorId = id;
 
@@ -513,11 +560,11 @@
           const store = tx.objectStore("sectors");
           const req = store.get(id);
           req.onsuccess = () => {
-            if (req.result && req.result.passaggi >= 2) {
+            if (req.result && req.result.passaggi >= 1) {
               dbgDbStatus = `HIT_${req.result.passaggi}p`;
-              resolve(Math.round(req.result.v_media));
+              resolve(req.result);
             } else {
-              dbgDbStatus = req.result ? "MISS_ONLY_1p" : "MISS_EMPTY";
+              dbgDbStatus = "MISS_EMPTY";
               resolve(null);
             }
           };
@@ -543,11 +590,10 @@
 
           const sectorMap = {};
           tripData.forEach(p => {
-            if (p.speed > 5) {
-              const id = generaIdSettore(p.lat, p.lon, new Date(p.iso));
-              if (!sectorMap[id]) sectorMap[id] = [];
-              sectorMap[id].push(p.speed);
-            }
+            const id = generaIdSettore(p.lat, p.lon, new Date(p.iso));
+            if (!sectorMap[id]) sectorMap[id] = { speeds: [], stops: 0 };
+            if (p.speed > 5) sectorMap[id].speeds.push(p.speed);
+            if (p.speed === 0) sectorMap[id].stops++;
           });
 
           const keys = Object.keys(sectorMap);
@@ -561,14 +607,17 @@
           keys.forEach(id => {
             const getReq = store.get(id);
             getReq.onsuccess = () => {
-              const speeds = sectorMap[id];
-              const tripAvgSpeed = speeds.reduce((a, b) => a + b, 0) / speeds.length;
+              const entry = sectorMap[id];
+              const tripAvgSpeed = entry.speeds.length > 0 
+                ? (entry.speeds.reduce((a, b) => a + b, 0) / entry.speeds.length) 
+                : 30;
               let item = getReq.result;
 
               if (item) {
                 const n = item.passaggi + 1;
                 item.v_media = item.v_media + (tripAvgSpeed - item.v_media) / n;
                 item.passaggi = n;
+                item.totale_stop = (item.totale_stop || 0) + (entry.stops > 0 ? 1 : 0);
                 item.ultimo_aggiornamento = new Date().toISOString();
                 store.put(item);
               } else {
@@ -576,6 +625,7 @@
                   id: id,
                   v_media: tripAvgSpeed,
                   passaggi: 1,
+                  totale_stop: (entry.stops > 0 ? 1 : 0),
                   ultimo_aggiornamento: new Date().toISOString()
                 });
               }
@@ -612,7 +662,7 @@
     initDB();
 
     // ==========================================
-    // 2. AUDIO & WAKE LOCK RE-ENGAGE
+    // 2. AUDIO SYNTH (CHIMES & BRAKING AUDITOR)
     // ==========================================
     let audioCtx = null;
     function initAudioContext() {
@@ -630,6 +680,7 @@
       gain.connect(audioCtx.destination);
 
       if (type === 'coast') {
+        // Tono discendente morbido (Veleggia)
         osc.frequency.setValueAtTime(587.33, now);
         osc.frequency.exponentialRampToValueAtTime(392.00, now + 0.3);
         gain.gain.setValueAtTime(0.2, now);
@@ -637,11 +688,30 @@
         osc.start(now);
         osc.stop(now + 0.35);
       } else if (type === 'warn') {
+        // Doppio bip di allarme
         osc.frequency.setValueAtTime(493.88, now);
         gain.gain.setValueAtTime(0.25, now);
         gain.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
         osc.start(now);
         osc.stop(now + 0.12);
+      } else if (type === 'hardbrake') {
+        // Tono sordo e grave (Braking Auditor)
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.exponentialRampToValueAtTime(70, now + 0.3);
+        gain.gain.setValueAtTime(0.4, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+        osc.start(now);
+        osc.stop(now + 0.35);
+      } else if (type === 'greenwave') {
+        // Rintocco armonico ascendente (Onda Verde agganciata)
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, now);
+        osc.frequency.exponentialRampToValueAtTime(659.25, now + 0.25);
+        gain.gain.setValueAtTime(0.2, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+        osc.start(now);
+        osc.stop(now + 0.3);
       }
     }
 
@@ -678,10 +748,15 @@
       tripData = [];
       sampleCount = 0;
       stopCount = 0;
+      harshBrakesCount = 0;
       previousCoord = null;
+      previousSpeedKmh = 0;
+      previousAltitude = null;
+      currentSlopePerc = 0;
       liveFlowSpeed = null;
       liveFreeFlowSpeed = null;
       histLearnedSpeed = null;
+      greenWaveTarget = null;
       dbgTomTomStatus = "STANDBY";
       dbgOsmStatus = "STANDBY";
       startTime = new Date();
@@ -689,7 +764,7 @@
       lastChimeTime = Date.now();
 
       await requestWakeLock();
-      speak("Monitoraggio avviato con telemetria estesa");
+      speak("Pacer cinetico avviato");
 
       if ("geolocation" in navigator) {
         watchId = navigator.geolocation.watchPosition(
@@ -720,32 +795,70 @@
       btnAction.innerText = "AVVIA VIAGGIO REALE";
       btnAction.className = "btn-main btn-start";
       actionBannerEl.className = "action-banner";
-      actionBannerEl.innerText = "ELABORAZIONE IN CORSO...";
+      actionBannerEl.innerText = "ELABORAZIONE DATI...";
 
       const aggiornati = await addestraModelloConDatiViaggio();
-      document.getElementById('repLearned').innerText = `Appresi ${aggiornati} micro-settori stradali in archivio.`;
+      document.getElementById('repLearned').innerText = `Appresi ${aggiornati} micro-settori stradali in locale.`;
 
       mostraReportEfficienza();
       esportaCSV(wasWakeLockActive);
     }
 
     // ==========================================
-    // 3. LOGICA DI MARCIA & DIAGNOSTICA LIVE
+    // 3. LOGICA DI GUIDA, ALTIMETRIA & TELEMETRIA
     // ==========================================
     async function onGpsSuccess(pos) {
       const coords = pos.coords;
       const speedKmh = coords.speed !== null && coords.speed > 0 ? Math.round(coords.speed * 3.6) : 0;
       const accuracyM = Math.round(coords.accuracy || 0);
+      const altitudeM = coords.altitude !== null ? Math.round(coords.altitude) : null;
       const lat = coords.latitude;
       const lon = coords.longitude;
       const now = new Date();
       const elapsedSec = Math.round((now - startTime) / 1000);
 
+      // Calcolo direzione (Heading)
       if (coords.heading !== null && !isNaN(coords.heading) && coords.heading >= 0) {
         lastHeading = Math.round(coords.heading);
       } else if (previousCoord && speedKmh > 10) {
         lastHeading = Math.round(calcolaBearing(previousCoord.lat, previousCoord.lon, lat, lon));
       }
+
+      // ========================================================
+      // INCLINE-AWARE: CALCOLO PENDENZA ALTIMETRICA
+      // ========================================================
+      currentSlopePerc = 0;
+      if (previousCoord && altitudeM !== null && previousAltitude !== null) {
+        const distDelta = distanzaMetri(previousCoord.lat, previousCoord.lon, lat, lon);
+        if (distDelta >= 8) {
+          const deltaH = altitudeM - previousAltitude;
+          currentSlopePerc = Math.max(-15, Math.min(15, Math.round((deltaH / distDelta) * 100)));
+          previousAltitude = altitudeM;
+        }
+      } else if (altitudeM !== null && previousAltitude === null) {
+        previousAltitude = altitudeM;
+      }
+      slopeDispEl.innerText = `${currentSlopePerc > 0 ? '+' : ''}${currentSlopePerc}%`;
+
+      // ========================================================
+      // BRAKING AUDITOR: RILEVAMENTO FRENATA BRUSCA DISSIPATIVA
+      // ========================================================
+      dbgHarshBrakeFlag = 0;
+      const vCurrentMs = speedKmh / 3.6;
+      const vPrevMs = previousSpeedKmh / 3.6;
+      // Stima accelerazione su intervallo nominale 1s
+      dbgDecelMs2 = Math.round((vCurrentMs - vPrevMs) * 100) / 100;
+
+      if (dbgDecelMs2 < -1.8 && speedKmh > 8) {
+        dbgHarshBrakeFlag = 1;
+        harshBrakesCount++;
+        harshBrakesCountEl.innerText = harshBrakesCount;
+        playChime('hardbrake');
+        actionBannerEl.className = "action-banner hardbrake";
+        actionBannerEl.innerText = "FRENATA DISSIPATIVA";
+      }
+
+      previousSpeedKmh = speedKmh;
       previousCoord = { lat, lon };
 
       gpsSpeedEl.innerText = speedKmh;
@@ -753,29 +866,47 @@
       sampleCount++;
       sampleCountEl.innerText = sampleCount;
 
-      aggiornaLimiteStradale(lat, lon);
+      // Aggiornamento limite con MAP-MATCHING HEADING FILTER
+      aggiornaLimiteStradale(lat, lon, lastHeading);
 
       const nowTime = Date.now();
 
-      // Interrogazione TomTom ogni 18s se in marcia
+      // Interrogazione TomTom (radar proporzionato alla pendenza)
       if (tomtomApiKey && (nowTime - lastTrafficCheckTime > 18000) && speedKmh > 20 && lastHeading !== null) {
         lastTrafficCheckTime = nowTime;
-        interrogaRadarTraffico(lat, lon, lastHeading, speedKmh);
+        interrogaRadarTraffico(lat, lon, lastHeading, speedKmh, currentSlopePerc);
       }
 
-      // Interrogazione Memoria Storica ogni 8s
-      if (nowTime - lastDbCheckTime > 8000 && lastHeading !== null) {
+      // ========================================================
+      // ONDA VERDE VIRTUALE & MEMORIA STORICA (350m davanti)
+      // ========================================================
+      greenWaveTarget = null;
+      if (nowTime - lastDbCheckTime > 7000 && lastHeading !== null) {
         lastDbCheckTime = nowTime;
-        const sondaAnticipo = proiettaCoordinate(lat, lon, 400, lastHeading);
-        histLearnedSpeed = await leggiVelocitaStorica(sondaAnticipo.lat, sondaAnticipo.lon);
-        if (histLearnedSpeed !== null) {
+        const sondaAnticipo = proiettaCoordinate(lat, lon, 350, lastHeading);
+        const secInfo = await leggiSettoreStorico(sondaAnticipo.lat, sondaAnticipo.lon);
+
+        if (secInfo) {
+          histLearnedSpeed = Math.round(secInfo.v_media);
+          histStopProbability = (secInfo.totale_stop || 0) / Math.max(1, secInfo.passaggi);
+
+          // Se il settore davanti ha un'alta frequenza di stop (incrocio semaforizzato)
+          if (histStopProbability >= 0.35 && speedKmh > 25) {
+            // Suggerisce una velocità di crociera d'onda verde per assorbire il ciclo
+            greenWaveTarget = Math.max(25, Math.min(Math.round(currentLimit * 0.72), histLearnedSpeed));
+          }
           dbStatusEl.innerText = `${histLearnedSpeed} km/h`;
         }
       }
 
-      // TARGET FLOW CALCULATION
+      // ========================================================
+      // CALCOLO TARGET COMBINATO & TRIGGER COASTING INCLINE-AWARE
+      // ========================================================
       let targetSpeed = currentLimit;
-      if (liveFlowSpeed !== null && liveFlowSpeed > 0) {
+
+      if (greenWaveTarget !== null) {
+        targetSpeed = greenWaveTarget;
+      } else if (liveFlowSpeed !== null && liveFlowSpeed > 0) {
         targetSpeed = Math.min(liveFlowSpeed, currentLimit);
       } else if (histLearnedSpeed !== null && histLearnedSpeed > 0) {
         targetSpeed = Math.min(histLearnedSpeed, currentLimit);
@@ -783,13 +914,24 @@
 
       targetSpeedValEl.innerText = targetSpeed;
 
+      // Modula la soglia di trigger coasting in base alla pendenza:
+      // In discesa (slope < -2%) si veleggia con minor scarto; in salita (slope > 2%) serve più inerzia
+      let coastingDeltaThreshold = 7;
+      if (currentSlopePerc <= -2) coastingDeltaThreshold = 5;
+      else if (currentSlopePerc >= 2) coastingDeltaThreshold = 10;
+
       isCoasting = false;
       let stato = "SCORREVOLE";
 
-      if (targetSpeed < (currentLimit * 0.70) && speedKmh > (targetSpeed + 7)) {
+      if (greenWaveTarget !== null && speedKmh > (targetSpeed + coastingDeltaThreshold)) {
+        isCoasting = true;
+        stato = "ONDA_VERDE_COASTING";
+        statusMsgEl.innerText = `ONDA VERDE: SINCRONIZZAZIONE A ${targetSpeed} KM/H`;
+        statusMsgEl.style.color = "#00E676";
+      } else if (targetSpeed < (currentLimit * 0.72) && speedKmh > (targetSpeed + coastingDeltaThreshold)) {
         isCoasting = true;
         stato = "DECELERAZIONE";
-        const fonte = (liveFlowSpeed !== null) ? "FLUSSO" : "MEMORIA";
+        const fonte = (liveFlowSpeed !== null) ? "FLUSSO" : "STORICO";
         statusMsgEl.innerText = `RALLENTAMENTO (${fonte}: ${targetSpeed} KM/H)`;
         statusMsgEl.style.color = "#FFB300";
       } else if (speedKmh > currentLimit + 4) {
@@ -797,16 +939,19 @@
         statusMsgEl.innerText = "SUPERAMENTO LIMITE LEGALE";
         statusMsgEl.style.color = "#FF3D00";
       } else {
-        const modalita = (histLearnedSpeed !== null) ? "FLUSSO + STORICO ATTIVO" : "FLUSSO REGOLARE";
-        statusMsgEl.innerText = modalita;
+        const modo = greenWaveTarget ? "ONDA VERDE AGGANCIATA" : (histLearnedSpeed ? "FLUSSO + STORICO" : "FLUSSO REGOLARE");
+        statusMsgEl.innerText = modo;
         statusMsgEl.style.color = "#00E5FF";
       }
 
-      aggiornaHUD(speedKmh, targetSpeed, isCoasting);
+      // Se non c'è una frenata brusca in corso, aggiorna il banner normale
+      if (dbgHarshBrakeFlag === 0) {
+        aggiornaHUD(speedKmh, targetSpeed, isCoasting, greenWaveTarget !== null);
+      }
 
       const isLockActive = (wakeLock !== null && !wakeLock.released);
 
-      // REGISTRAZIONE COMPLETA DI DEBUG
+      // TELEMETRIA COMPLETA NEL FILE CSV
       tripData.push({
         iso: now.toISOString(),
         secondi: elapsedSec,
@@ -815,13 +960,17 @@
         speed: speedKmh,
         accuratezza_gps_m: accuracyM,
         heading_deg: lastHeading !== null ? lastHeading : "N/D",
+        altitudine_m: altitudeM !== null ? altitudeM : "N/D",
+        pendenza_perc: currentSlopePerc,
+        decelerazione_ms2: dbgDecelMs2,
+        frenata_brusca_flag: dbgHarshBrakeFlag,
         limite: currentLimit,
         velocita_tomtom: liveFlowSpeed !== null ? liveFlowSpeed : "N/D",
         velocita_storico_db: histLearnedSpeed !== null ? histLearnedSpeed : "N/D",
         target: targetSpeed,
+        onda_verde_target: greenWaveTarget !== null ? greenWaveTarget : "N/D",
         coasting: isCoasting ? 1 : 0,
         stato: stato,
-        // Colonne Diagnostica
         tomtom_status: dbgTomTomStatus,
         tomtom_latenza_ms: dbgTomTomLatencyMs,
         sonda_dist_m: dbgProbeDistM,
@@ -829,8 +978,10 @@
         sonda_lon: dbgProbeLon,
         osm_status: dbgOsmStatus,
         osm_tipo_strada: dbgOsmType,
+        osm_diff_deg: dbgOsmDiffDeg,
         db_hit_status: dbgDbStatus,
         db_settore_id: dbgSectorId,
+        conteggio_frenate_brusche: harshBrakesCount,
         wakelock_attivo: isLockActive ? 1 : 0
       });
     }
@@ -840,7 +991,10 @@
       statusMsgEl.style.color = "#FF3D00";
     }
 
-    function aggiornaHUD(vReale, vTarget, coastingAttivo) {
+    // ==========================================
+    // 4. RENDERING HUD
+    // ==========================================
+    function aggiornaHUD(vReale, vTarget, coastingAttivo, isOndaVerde) {
       const diff = vReale - vTarget;
       const now = Date.now();
 
@@ -849,14 +1003,14 @@
       smoothingIndicatorEl.style.left = `${leftPercent}%`;
 
       if (coastingAttivo) {
-        actionBannerEl.className = "action-banner coasting";
-        actionBannerEl.innerText = "VELEGGIA / RILASCIA";
-        targetSpeedValEl.style.color = "#FFB300";
-        smoothingIndicatorEl.style.backgroundColor = "#FF9100";
-        mySpeedBoxEl.style.borderColor = "#FF9100";
+        actionBannerEl.className = isOndaVerde ? "action-banner greenwave" : "action-banner coasting";
+        actionBannerEl.innerText = isOndaVerde ? "VELEGGIA &bull; ONDA VERDE" : "VELEGGIA / RILASCIA";
+        targetSpeedValEl.style.color = isOndaVerde ? "#00E676" : "#FFB300";
+        smoothingIndicatorEl.style.backgroundColor = isOndaVerde ? "#00E676" : "#FF9100";
+        mySpeedBoxEl.style.borderColor = isOndaVerde ? "#00E676" : "#FF9100";
 
         if (now - lastChimeTime > 7000) {
-          playChime('coast');
+          playChime(isOndaVerde ? 'greenwave' : 'coast');
           lastChimeTime = now;
         }
       } else if (vReale > currentLimit + 4) {
@@ -871,8 +1025,8 @@
           lastVoiceNoticeTime = now;
         }
       } else {
-        actionBannerEl.className = "action-banner";
-        actionBannerEl.innerText = "FLUSSO REGOLARE";
+        actionBannerEl.className = isOndaVerde ? "action-banner greenwave" : "action-banner";
+        actionBannerEl.innerText = isOndaVerde ? "ONDA VERDE ATTIVA" : "FLUSSO REGOLARE";
         targetSpeedValEl.style.color = "#00E676";
         smoothingIndicatorEl.style.backgroundColor = "#00E676";
         mySpeedBoxEl.style.borderColor = "#242424";
@@ -880,10 +1034,15 @@
     }
 
     // ==========================================
-    // 4. RADAR TOMTOM CON DIAGNOSTICA COMPLETA
+    // 5. RADAR TOMTOM (INCLINE-AWARE)
     // ==========================================
-    async function interrogaRadarTraffico(lat, lon, headingDeg, speedKmh) {
-      dbgProbeDistM = speedKmh > 70 ? 1200 : 500;
+    async function interrogaRadarTraffico(lat, lon, headingDeg, speedKmh, slopePerc) {
+      let baseDist = speedKmh > 70 ? 1200 : 500;
+      // Se in discesa marcata, allunga la sonda per anticipare la minor capacità frenante naturale
+      if (slopePerc <= -2) baseDist += 200;
+      else if (slopePerc >= 2) baseDist = Math.max(350, baseDist - 150);
+
+      dbgProbeDistM = baseDist;
       const sonda = proiettaCoordinate(lat, lon, dbgProbeDistM, headingDeg);
       dbgProbeLat = sonda.lat;
       dbgProbeLon = sonda.lon;
@@ -908,8 +1067,6 @@
           liveFlowSpeed = data.flowSegmentData.currentSpeed;
           liveFreeFlowSpeed = data.flowSegmentData.freeFlowSpeed;
           radarStatusEl.innerText = `${liveFlowSpeed} km/h`;
-        } else {
-          dbgTomTomStatus = "NO_DATA_FIELD";
         }
       } catch (err) {
         dbgTomTomLatencyMs = Math.round(performance.now() - tStart);
@@ -919,16 +1076,16 @@
     }
 
     // ==========================================
-    // 5. OSM OVERPASS CON DIAGNOSTICA
+    // 6. MAP-MATCHING OSM CON FILTRO HEADING
     // ==========================================
-    async function aggiornaLimiteStradale(lat, lon) {
+    async function aggiornaLimiteStradale(lat, lon, headingDeg) {
       if (lastQueryPos) {
         const d = distanzaMetri(lastQueryPos.lat, lastQueryPos.lon, lat, lon);
-        if (d < 250) return;
+        if (d < 180) return;
       }
       lastQueryPos = { lat, lon };
 
-      const query = `[out:json][timeout:3];way(around:35,${lat},${lon})[highway];out tags;`;
+      const query = `[out:json][timeout:3];way(around:35,${lat},${lon})[highway];out geom tags;`;
       try {
         const res = await fetch("https://overpass-api.de/api/interpreter", {
           method: "POST",
@@ -943,28 +1100,73 @@
         const data = await res.json();
         dbgOsmStatus = "200_OK";
 
+        const escluse = ["footway", "cycleway", "path", "pedestrian", "steps", "track", "service"];
         const fallback = {
           "motorway": 130, "trunk": 110, "primary": 90,
           "secondary": 90, "tertiary": 50, "residential": 50, "unclassified": 50, "living_street": 30
         };
 
+        let bestCandidate = null;
+        let minDiff = 999;
+
         for (const el of data.elements || []) {
           const tags = el.tags || {};
+          const hw = tags.highway;
+          if (!hw || escluse.includes(hw)) continue;
+
+          const roadBearing = calcolaBearingMedioStrada(el.geometry, lat, lon);
+          let diffAngolare = 0;
+
+          if (headingDeg !== null && roadBearing !== null) {
+            const d1 = Math.abs(roadBearing - headingDeg) % 360;
+            const diff1 = d1 > 180 ? 360 - d1 : d1;
+            const d2 = Math.abs(((roadBearing + 180) % 360) - headingDeg) % 360;
+            const diff2 = d2 > 180 ? 360 - d2 : d2;
+            diffAngolare = Math.min(diff1, diff2);
+          }
+
+          if (diffAngolare < 40 && diffAngolare < minDiff) {
+            minDiff = diffAngolare;
+            bestCandidate = el;
+          }
+        }
+
+        if (bestCandidate) {
+          dbgOsmDiffDeg = Math.round(minDiff);
+          const tags = bestCandidate.tags;
           if (tags.maxspeed && !isNaN(parseInt(tags.maxspeed))) {
             dbgOsmType = `TAG_MAXSPEED_${tags.maxspeed}`;
             impostaLimite(parseInt(tags.maxspeed));
             return;
           }
           if (tags.highway && fallback[tags.highway]) {
-            dbgOsmType = `FALLBACK_${tags.highway}`;
+            dbgOsmType = `MATCH_FALLBACK_${tags.highway}`;
             impostaLimite(fallback[tags.highway]);
             return;
           }
+        } else {
+          dbgOsmType = "NO_ALIGNED_ROAD";
+          dbgOsmDiffDeg = "N/D";
         }
-        dbgOsmType = "NO_MATCHING_HIGHWAY";
       } catch (e) {
         dbgOsmStatus = "FETCH_FAIL";
       }
+    }
+
+    function calcolaBearingMedioStrada(geometry, carLat, carLon) {
+      if (!geometry || geometry.length < 2) return null;
+      let minDist = 99999;
+      let bestIdx = 0;
+      for (let i = 0; i < geometry.length - 1; i++) {
+        const d = distanzaMetri(carLat, carLon, geometry[i].lat, geometry[i].lon);
+        if (d < minDist) {
+          minDist = d;
+          bestIdx = i;
+        }
+      }
+      const p1 = geometry[bestIdx];
+      const p2 = geometry[Math.min(bestIdx + 1, geometry.length - 1)];
+      return calcolaBearing(p1.lat, p1.lon, p2.lat, p2.lon);
     }
 
     function impostaLimite(nuovoLimite) {
@@ -974,6 +1176,9 @@
       }
     }
 
+    // ==========================================
+    // 7. REPORT EFFICIENZA POST-VIAGGIO
+    // ==========================================
     function mostraReportEfficienza() {
       if (tripData.length < 5) return;
 
@@ -1003,13 +1208,14 @@
       const deltaEkMj = (deltaEkJoules / 1e6).toFixed(2);
       const fuelLiters = (deltaEkJoules / (33e6 * 0.28)).toFixed(2);
 
-      let score = Math.round(100 - (stopsCount * 4.5) - (deltaEkMj * 4.0 / Math.max(1, distKm)));
+      let score = Math.round(100 - (stopsCount * 4.0) - (harshBrakesCount * 5.0) - (deltaEkMj * 3.5 / Math.max(1, distKm)));
       score = Math.max(15, Math.min(98, score));
 
       document.getElementById('repScore').innerText = score;
       document.getElementById('repDist').innerText = `${distKm} km`;
       document.getElementById('repAvgSpeed').innerText = `${avgSpeedKmh} km/h`;
       document.getElementById('repStops').innerText = `${stopsCount}`;
+      document.getElementById('repHarshBrakes').innerText = `${harshBrakesCount}`;
       document.getElementById('repEnergy').innerText = `${deltaEkMj} MJ`;
       document.getElementById('repFuel').innerText = `${fuelLiters} L`;
 
@@ -1020,7 +1226,7 @@
       reportModal.style.display = 'none';
     }
 
-    // Geodesica & Utilità
+    // Geodesica & Controlli UI
     function proiettaCoordinate(lat, lon, distanzaM, bearingDeg) {
       const R = 6371000;
       const d = distanzaM / R;
@@ -1063,6 +1269,11 @@
       document.getElementById('btnMirror').classList.toggle('active');
     }
 
+    function toggleNightHUD() {
+      document.body.classList.toggle('hud-night');
+      document.getElementById('btnNight').classList.toggle('active');
+    }
+
     function toggleAudio() {
       audioEnabled = !audioEnabled;
       const btn = document.getElementById('btnAudio');
@@ -1071,7 +1282,7 @@
     }
 
     // ==========================================
-    // 6. ESPORTAZIONE CSV CON COLONNE DIAGNOSTICHE
+    // 8. ESPORTAZIONE TELEMETRIA CSV ESTESA
     // ==========================================
     function esportaCSV(wasWakeLockActive) {
       if (tripData.length === 0) return;
@@ -1084,10 +1295,15 @@
         "velocita_gps_kmh",
         "accuratezza_gps_m",
         "heading_deg",
+        "altitudine_m",
+        "pendenza_perc",
+        "decelerazione_ms2",
+        "frenata_brusca_flag",
         "limite_vigente_kmh",
         "velocita_tomtom",
         "velocita_storico_db",
         "target_crociera",
+        "onda_verde_target",
         "coasting_attivo",
         "stato",
         "tomtom_status",
@@ -1097,8 +1313,10 @@
         "sonda_lon",
         "osm_status",
         "osm_tipo_strada",
+        "osm_diff_deg",
         "db_hit_status",
         "db_settore_id",
+        "conteggio_frenate_brusche",
         "wakelock_attivo"
       ].join(",");
 
@@ -1112,10 +1330,15 @@
           r.speed,
           r.accuratezza_gps_m,
           r.heading_deg,
+          r.altitudine_m,
+          r.pendenza_perc,
+          r.decelerazione_ms2,
+          r.frenata_brusca_flag,
           r.limite,
           r.velocita_tomtom,
           r.velocita_storico_db,
           r.target,
+          r.onda_verde_target,
           r.coasting,
           r.stato,
           r.tomtom_status,
@@ -1125,14 +1348,15 @@
           r.sonda_lon,
           r.osm_status,
           r.osm_tipo_strada,
+          r.osm_diff_deg,
           r.db_hit_status,
           r.db_settore_id,
+          r.conteggio_frenate_brusche,
           r.wakelock_attivo
         ].join(","));
       });
 
-      const csvContent = csvRows.join("\n");
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const blob = new Blob([csvRows.join("\n")], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       const d = new Date();
