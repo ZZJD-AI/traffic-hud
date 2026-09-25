@@ -6,9 +6,9 @@
   
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="HUD Speed">
+  <meta name="apple-mobile-web-app-title" content="Traffic Pacer">
 
-  <title>HUD Traffic Flow Advisor</title>
+  <title>HUD Traffic Flow & Debug Pacer</title>
   <style>
     * {
       box-sizing: border-box;
@@ -85,7 +85,7 @@
       border-color: #00E5FF;
     }
 
-    /* CENTRO: VELOCITÀ & FLUSSO REALE */
+    /* CENTRO: FLUSSO IN PRIMO PIANO */
     .speed-display {
       flex: 1;
       display: flex;
@@ -95,48 +95,69 @@
       width: 100%;
       max-width: 500px;
     }
-    .coasting-banner {
-      display: none;
-      background-color: rgba(255, 145, 0, 0.2);
-      border: 2px solid #FF9100;
-      color: #FFB300;
-      padding: 6px 18px;
-      border-radius: 20px;
-      font-size: 14px;
+    
+    .action-banner {
+      background-color: #121212;
+      border: 2px solid #242424;
+      color: #00E5FF;
+      padding: 8px 24px;
+      border-radius: 24px;
+      font-size: 15px;
       font-weight: 900;
-      letter-spacing: 1px;
+      letter-spacing: 1.5px;
       margin-bottom: 12px;
+      text-transform: uppercase;
+      transition: all 0.3s ease;
+    }
+    .action-banner.coasting {
+      background-color: rgba(255, 145, 0, 0.2);
+      border-color: #FF9100;
+      color: #FFB300;
       animation: pulse 1.2s infinite alternate;
     }
+    .action-banner.alert {
+      background-color: rgba(255, 61, 0, 0.2);
+      border-color: #FF3D00;
+      color: #FF3D00;
+    }
     @keyframes pulse {
-      from { opacity: 0.7; transform: scale(0.98); }
+      from { opacity: 0.75; transform: scale(0.98); }
       to { opacity: 1; transform: scale(1.02); }
     }
-    .current-speed {
-      font-size: clamp(90px, 30vw, 150px);
+
+    .target-label {
+      color: #8E8E93;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+
+    .target-speed-val {
+      font-size: clamp(95px, 32vw, 155px);
       font-weight: 900;
       line-height: 0.88;
-      color: #00E5FF;
+      color: #00E676;
       letter-spacing: -4px;
       font-variant-numeric: tabular-nums;
       text-align: center;
       transition: color 0.3s ease;
     }
     .speed-unit {
-      color: #8E8E93;
-      font-size: 13px;
-      font-weight: 700;
+      color: #636366;
+      font-size: 12px;
+      font-weight: 800;
       letter-spacing: 3px;
-      margin-top: 8px;
+      margin-top: 6px;
     }
 
-    /* BARRA ZONA FLUSSO */
     .smoothing-bar-container {
-      width: 80%;
+      width: 75%;
       height: 6px;
       background-color: #242426;
       border-radius: 4px;
-      margin-top: 16px;
+      margin-top: 14px;
       position: relative;
       overflow: hidden;
     }
@@ -151,17 +172,22 @@
       transition: all 0.3s ease-out;
     }
 
-    .advised-box {
+    .my-speed-box {
       margin-top: 14px;
-      padding: 8px 20px;
-      border-radius: 20px;
+      padding: 6px 18px;
+      border-radius: 18px;
       background-color: #121212;
       border: 1px solid #242424;
       font-size: 13px;
       font-weight: 800;
       letter-spacing: 0.5px;
-      color: #00E5FF;
+      color: #8E8E93;
       transition: all 0.3s ease;
+    }
+    .my-speed-box span {
+      color: #FFFFFF;
+      font-weight: 900;
+      font-size: 15px;
     }
 
     /* BOTTOM BAR */
@@ -264,7 +290,7 @@
       grid-template-columns: 1fr 1fr;
       gap: 12px;
       text-align: left;
-      margin-bottom: 22px;
+      margin-bottom: 16px;
     }
     .report-item {
       background: #1E1E22;
@@ -281,6 +307,12 @@
       font-weight: 800;
       color: #FFFFFF;
       margin-top: 2px;
+    }
+    .learned-info {
+      font-size: 12px;
+      color: #00E5FF;
+      margin-bottom: 16px;
+      font-weight: 700;
     }
     .btn-close {
       width: 100%;
@@ -307,18 +339,20 @@
     </div>
   </div>
 
-  <!-- CENTRO: VELOCITÀ & FLUSSO REALE -->
+  <!-- CENTRO: CROCIERA DEL FLUSSO -->
   <div class="speed-display">
-    <div class="coasting-banner" id="coastingBanner">VELEGGIA / RILASCIA</div>
-    <div class="current-speed" id="gpsSpeed">0</div>
-    <div class="speed-unit">KM/H REALI</div>
+    <div class="action-banner" id="actionBanner">IN ATTESA DI PARTENZA</div>
+    
+    <div class="target-label">Velocità Flusso Consigliata</div>
+    <div class="target-speed-val" id="targetSpeedVal">--</div>
+    <div class="speed-unit">KM/H TARGET</div>
     
     <div class="smoothing-bar-container">
       <div class="smoothing-indicator" id="smoothingIndicator"></div>
     </div>
 
-    <div class="advised-box" id="advisedBox">
-      IN ATTESA DI PARTENZA
+    <div class="my-speed-box" id="mySpeedBox">
+      Tua Velocità: <span id="gpsSpeed">0</span> km/h
     </div>
   </div>
 
@@ -328,8 +362,8 @@
       <div class="status-msg" id="statusMsg">PRONTO ALLA PARTENZA</div>
       <div class="telemetry-mini">
         <span>Campioni: <b id="sampleCount">0</b></span>
-        <span>Stops: <b id="stopCount">0</b></span>
-        <span>Flusso TomTom: <b id="radarStatus">--</b></span>
+        <span>TomTom: <b id="radarStatus">--</b></span>
+        <span>Memoria: <b id="dbStatus">0 sett.</b></span>
       </div>
     </div>
     
@@ -368,6 +402,7 @@
         </div>
       </div>
 
+      <div class="learned-info" id="repLearned">Aggiornamento pattern stradali completato...</div>
       <button class="btn-close" onclick="chiudiReport()">CHIUDI E TORNA ALL'HUD</button>
     </div>
   </div>
@@ -380,7 +415,7 @@
 
     let tomtomApiKey = localStorage.getItem("tomtom_api_key") || "";
 
-    // Dati telemetria
+    // Telemetria di marcia
     let tripData = [];
     let startTime = null;
     let sampleCount = 0;
@@ -388,28 +423,41 @@
     let currentLimit = 50;
     let lastQueryPos = null;
     let lastTrafficCheckTime = 0;
+    let lastDbCheckTime = 0;
     let lastHeading = null;
     let previousCoord = null;
 
-    // Dati traffico e flusso reale TomTom
-    let liveFlowSpeed = null;      // Velocità reale del segmento TomTom
-    let liveFreeFlowSpeed = null;  // Velocità teorica a strada libera
-    let trafficLevel = "NORMALE";   // LIBERO, NORMALE, DENSO, CODA
+    // Traffico live e memoria storica
+    let liveFlowSpeed = null;
+    let liveFreeFlowSpeed = null;
+    let histLearnedSpeed = null;
+    let trafficLevel = "NORMALE";
     let isCoasting = false;
+
+    // VARIABILI DEBUG & DIAGNOSTICA
+    let dbgTomTomStatus = "STANDBY";
+    let dbgTomTomLatencyMs = 0;
+    let dbgProbeDistM = 0;
+    let dbgProbeLat = "N/D";
+    let dbgProbeLon = "N/D";
+    let dbgOsmStatus = "STANDBY";
+    let dbgOsmType = "INIT";
+    let dbgDbStatus = "STANDBY";
+    let dbgSectorId = "N/D";
 
     let lastVoiceNoticeTime = 0;
     let lastChimeTime = 0;
-    let lastAnnouncedDelta = 0;
 
     // DOM
     const gpsSpeedEl = document.getElementById('gpsSpeed');
-    const advisedBoxEl = document.getElementById('advisedBox');
+    const targetSpeedValEl = document.getElementById('targetSpeedVal');
+    const actionBannerEl = document.getElementById('actionBanner');
+    const mySpeedBoxEl = document.getElementById('mySpeedBox');
     const speedLimitEl = document.getElementById('speedLimit');
     const statusMsgEl = document.getElementById('statusMsg');
     const sampleCountEl = document.getElementById('sampleCount');
-    const stopCountEl = document.getElementById('stopCount');
     const radarStatusEl = document.getElementById('radarStatus');
-    const coastingBannerEl = document.getElementById('coastingBanner');
+    const dbStatusEl = document.getElementById('dbStatus');
     const smoothingIndicatorEl = document.getElementById('smoothingIndicator');
     const btnAction = document.getElementById('btnAction');
     const btnKey = document.getElementById('btnKey');
@@ -418,16 +466,158 @@
     if (tomtomApiKey) btnKey.classList.add('active');
 
     // ==========================================
-    // 1. SINTETIZZATORE AUDIO (CHIMES)
+    // 1. MOTORE APPRENDIMENTO LOCALE (INDEXEDDB)
+    // ==========================================
+    const DB_NAME = "TrafficLearningDB";
+    const DB_VERSION = 1;
+    let dbInstance = null;
+
+    function initDB() {
+      return new Promise((resolve) => {
+        const req = indexedDB.open(DB_NAME, DB_VERSION);
+        req.onupgradeneeded = (e) => {
+          const db = e.target.result;
+          if (!db.objectStoreNames.contains("sectors")) {
+            db.createObjectStore("sectors", { keyPath: "id" });
+          }
+        };
+        req.onsuccess = (e) => {
+          dbInstance = e.target.result;
+          aggiornaConteggioSettori();
+          resolve(dbInstance);
+        };
+        req.onerror = () => resolve(null);
+      });
+    }
+
+    function generaIdSettore(lat, lon, dateObj) {
+      const latGrid = parseFloat(lat).toFixed(3);
+      const lonGrid = parseFloat(lon).toFixed(3);
+      const isWeekend = (dateObj.getDay() === 0 || dateObj.getDay() === 6) ? "WND" : "WKD";
+      const h = dateObj.getHours();
+      const mSlot = dateObj.getMinutes() < 30 ? "00" : "30";
+      return `${latGrid}_${lonGrid}_${isWeekend}_${h}:${mSlot}`;
+    }
+
+    async function leggiVelocitaStorica(lat, lon) {
+      if (!dbInstance) {
+        dbgDbStatus = "NO_INSTANCE";
+        return null;
+      }
+      const id = generaIdSettore(lat, lon, new Date());
+      dbgSectorId = id;
+
+      return new Promise((resolve) => {
+        try {
+          const tx = dbInstance.transaction("sectors", "readonly");
+          const store = tx.objectStore("sectors");
+          const req = store.get(id);
+          req.onsuccess = () => {
+            if (req.result && req.result.passaggi >= 2) {
+              dbgDbStatus = `HIT_${req.result.passaggi}p`;
+              resolve(Math.round(req.result.v_media));
+            } else {
+              dbgDbStatus = req.result ? "MISS_ONLY_1p" : "MISS_EMPTY";
+              resolve(null);
+            }
+          };
+          req.onerror = () => {
+            dbgDbStatus = "ERR_READ";
+            resolve(null);
+          };
+        } catch (e) {
+          dbgDbStatus = "EXCEPTION";
+          resolve(null);
+        }
+      });
+    }
+
+    async function addestraModelloConDatiViaggio() {
+      if (!dbInstance || tripData.length < 10) return 0;
+      let settoriAggiornati = 0;
+
+      return new Promise((resolve) => {
+        try {
+          const tx = dbInstance.transaction("sectors", "readwrite");
+          const store = tx.objectStore("sectors");
+
+          const sectorMap = {};
+          tripData.forEach(p => {
+            if (p.speed > 5) {
+              const id = generaIdSettore(p.lat, p.lon, new Date(p.iso));
+              if (!sectorMap[id]) sectorMap[id] = [];
+              sectorMap[id].push(p.speed);
+            }
+          });
+
+          const keys = Object.keys(sectorMap);
+          let processed = 0;
+
+          if (keys.length === 0) {
+            resolve(0);
+            return;
+          }
+
+          keys.forEach(id => {
+            const getReq = store.get(id);
+            getReq.onsuccess = () => {
+              const speeds = sectorMap[id];
+              const tripAvgSpeed = speeds.reduce((a, b) => a + b, 0) / speeds.length;
+              let item = getReq.result;
+
+              if (item) {
+                const n = item.passaggi + 1;
+                item.v_media = item.v_media + (tripAvgSpeed - item.v_media) / n;
+                item.passaggi = n;
+                item.ultimo_aggiornamento = new Date().toISOString();
+                store.put(item);
+              } else {
+                store.put({
+                  id: id,
+                  v_media: tripAvgSpeed,
+                  passaggi: 1,
+                  ultimo_aggiornamento: new Date().toISOString()
+                });
+              }
+
+              settoriAggiornati++;
+              processed++;
+              if (processed === keys.length) {
+                aggiornaConteggioSettori();
+                resolve(settoriAggiornati);
+              }
+            };
+            getReq.onerror = () => {
+              processed++;
+              if (processed === keys.length) resolve(settoriAggiornati);
+            };
+          });
+        } catch (e) {
+          resolve(0);
+        }
+      });
+    }
+
+    function aggiornaConteggioSettori() {
+      if (!dbInstance) return;
+      try {
+        const tx = dbInstance.transaction("sectors", "readonly");
+        const countReq = tx.objectStore("sectors").count();
+        countReq.onsuccess = () => {
+          dbStatusEl.innerText = `${countReq.result} sett.`;
+        };
+      } catch (e) {}
+    }
+
+    initDB();
+
+    // ==========================================
+    // 2. AUDIO & WAKE LOCK RE-ENGAGE
     // ==========================================
     let audioCtx = null;
     function initAudioContext() {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
     }
 
     function playChime(type) {
@@ -455,27 +645,18 @@
       }
     }
 
-    // ==========================================
-    // 2. WAKE LOCK RE-ENGAGE PER IPHONE
-    // ==========================================
     async function requestWakeLock() {
       try {
-        if ('wakeLock' in navigator) {
-          wakeLock = await navigator.wakeLock.request('screen');
-        }
+        if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
       } catch (err) {}
     }
 
     document.addEventListener('visibilitychange', async () => {
-      if (document.visibilityState === 'visible' && isTracking) {
-        await requestWakeLock();
-      }
+      if (document.visibilityState === 'visible' && isTracking) await requestWakeLock();
     });
 
     setInterval(async () => {
-      if (isTracking && (!wakeLock || wakeLock.released)) {
-        await requestWakeLock();
-      }
+      if (isTracking && (!wakeLock || wakeLock.released)) await requestWakeLock();
     }, 12000);
 
     function configuraChiave() {
@@ -488,11 +669,8 @@
     }
 
     async function toggleTrip() {
-      if (!isTracking) {
-        startTrip();
-      } else {
-        stopTripAndProcess();
-      }
+      if (!isTracking) startTrip();
+      else stopTripAndProcess();
     }
 
     async function startTrip() {
@@ -503,12 +681,15 @@
       previousCoord = null;
       liveFlowSpeed = null;
       liveFreeFlowSpeed = null;
+      histLearnedSpeed = null;
+      dbgTomTomStatus = "STANDBY";
+      dbgOsmStatus = "STANDBY";
       startTime = new Date();
       lastVoiceNoticeTime = Date.now();
       lastChimeTime = Date.now();
 
       await requestWakeLock();
-      speak("Monitoraggio flusso avviato");
+      speak("Monitoraggio avviato con telemetria estesa");
 
       if ("geolocation" in navigator) {
         watchId = navigator.geolocation.watchPosition(
@@ -527,8 +708,9 @@
       statusMsgEl.innerText = "AGGANCIO SEGNALE GPS...";
     }
 
-    function stopTripAndProcess() {
+    async function stopTripAndProcess() {
       if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      const wasWakeLockActive = (wakeLock !== null && !wakeLock.released);
       if (wakeLock !== null) {
         wakeLock.release().catch(() => {});
         wakeLock = null;
@@ -537,27 +719,32 @@
 
       btnAction.innerText = "AVVIA VIAGGIO REALE";
       btnAction.className = "btn-main btn-start";
-      coastingBannerEl.style.display = "none";
+      actionBannerEl.className = "action-banner";
+      actionBannerEl.innerText = "ELABORAZIONE IN CORSO...";
+
+      const aggiornati = await addestraModelloConDatiViaggio();
+      document.getElementById('repLearned').innerText = `Appresi ${aggiornati} micro-settori stradali in archivio.`;
 
       mostraReportEfficienza();
-      esportaCSV();
+      esportaCSV(wasWakeLockActive);
     }
 
     // ==========================================
-    // 3. LOGICA PRINCIPALE & VELOCITÀ DI FLUSSO
+    // 3. LOGICA DI MARCIA & DIAGNOSTICA LIVE
     // ==========================================
-    function onGpsSuccess(pos) {
+    async function onGpsSuccess(pos) {
       const coords = pos.coords;
       const speedKmh = coords.speed !== null && coords.speed > 0 ? Math.round(coords.speed * 3.6) : 0;
+      const accuracyM = Math.round(coords.accuracy || 0);
       const lat = coords.latitude;
       const lon = coords.longitude;
       const now = new Date();
       const elapsedSec = Math.round((now - startTime) / 1000);
 
       if (coords.heading !== null && !isNaN(coords.heading) && coords.heading >= 0) {
-        lastHeading = coords.heading;
+        lastHeading = Math.round(coords.heading);
       } else if (previousCoord && speedKmh > 10) {
-        lastHeading = calcolaBearing(previousCoord.lat, previousCoord.lon, lat, lon);
+        lastHeading = Math.round(calcolaBearing(previousCoord.lat, previousCoord.lon, lat, lon));
       }
       previousCoord = { lat, lon };
 
@@ -565,66 +752,86 @@
       if (speedKmh === 0) stopCount++;
       sampleCount++;
       sampleCountEl.innerText = sampleCount;
-      stopCountEl.innerText = stopCount;
 
       aggiornaLimiteStradale(lat, lon);
 
-      // Radar TomTom adattivo ogni 18 secondi se in marcia
       const nowTime = Date.now();
+
+      // Interrogazione TomTom ogni 18s se in marcia
       if (tomtomApiKey && (nowTime - lastTrafficCheckTime > 18000) && speedKmh > 20 && lastHeading !== null) {
         lastTrafficCheckTime = nowTime;
         interrogaRadarTraffico(lat, lon, lastHeading, speedKmh);
       }
 
-      // ========================================================
-      // CALCOLO CROCIERA DEL FLUSSO (TARGET INTELIGENTE)
-      // ========================================================
-      let targetSpeed = currentLimit;
-      
-      // Se TomTom fornisce la velocità reale del segmento, usiamo quella come crociera!
-      if (liveFlowSpeed !== null && liveFlowSpeed > 0) {
-        // La crociera ideale è il flusso reale, con tetto al limite di legge
-        targetSpeed = Math.min(liveFlowSpeed, currentLimit);
+      // Interrogazione Memoria Storica ogni 8s
+      if (nowTime - lastDbCheckTime > 8000 && lastHeading !== null) {
+        lastDbCheckTime = nowTime;
+        const sondaAnticipo = proiettaCoordinate(lat, lon, 400, lastHeading);
+        histLearnedSpeed = await leggiVelocitaStorica(sondaAnticipo.lat, sondaAnticipo.lon);
+        if (histLearnedSpeed !== null) {
+          dbStatusEl.innerText = `${histLearnedSpeed} km/h`;
+        }
       }
+
+      // TARGET FLOW CALCULATION
+      let targetSpeed = currentLimit;
+      if (liveFlowSpeed !== null && liveFlowSpeed > 0) {
+        targetSpeed = Math.min(liveFlowSpeed, currentLimit);
+      } else if (histLearnedSpeed !== null && histLearnedSpeed > 0) {
+        targetSpeed = Math.min(histLearnedSpeed, currentLimit);
+      }
+
+      targetSpeedValEl.innerText = targetSpeed;
 
       isCoasting = false;
       let stato = "SCORREVOLE";
 
-      // Verifica se il veicolo deve veleggiare (flusso in rallentamento marcato)
-      if (liveFlowSpeed !== null && liveFlowSpeed < (currentLimit * 0.65) && speedKmh > (liveFlowSpeed + 8)) {
+      if (targetSpeed < (currentLimit * 0.70) && speedKmh > (targetSpeed + 7)) {
         isCoasting = true;
         stato = "DECELERAZIONE";
-        statusMsgEl.innerText = `FLUSSO RALLENTATO A ${liveFlowSpeed} KM/H`;
+        const fonte = (liveFlowSpeed !== null) ? "FLUSSO" : "MEMORIA";
+        statusMsgEl.innerText = `RALLENTAMENTO (${fonte}: ${targetSpeed} KM/H)`;
         statusMsgEl.style.color = "#FFB300";
       } else if (speedKmh > currentLimit + 4) {
         stato = "ECCESSO";
         statusMsgEl.innerText = "SUPERAMENTO LIMITE LEGALE";
         statusMsgEl.style.color = "#FF3D00";
       } else {
-        statusMsgEl.innerText = `FLUSSO REGOLARE (${trafficLevel})`;
+        const modalita = (histLearnedSpeed !== null) ? "FLUSSO + STORICO ATTIVO" : "FLUSSO REGOLARE";
+        statusMsgEl.innerText = modalita;
         statusMsgEl.style.color = "#00E5FF";
       }
 
-      if (isCoasting) {
-        coastingBannerEl.style.display = "block";
-      } else {
-        coastingBannerEl.style.display = "none";
-      }
+      aggiornaHUD(speedKmh, targetSpeed, isCoasting);
 
-      aggiornaIndicazioniFlusso(speedKmh, targetSpeed, isCoasting);
+      const isLockActive = (wakeLock !== null && !wakeLock.released);
 
+      // REGISTRAZIONE COMPLETA DI DEBUG
       tripData.push({
         iso: now.toISOString(),
         secondi: elapsedSec,
         lat: lat.toFixed(6),
         lon: lon.toFixed(6),
         speed: speedKmh,
+        accuratezza_gps_m: accuracyM,
+        heading_deg: lastHeading !== null ? lastHeading : "N/D",
         limite: currentLimit,
-        velocita_flusso_tomtom: liveFlowSpeed !== null ? liveFlowSpeed : "N/D",
+        velocita_tomtom: liveFlowSpeed !== null ? liveFlowSpeed : "N/D",
+        velocita_storico_db: histLearnedSpeed !== null ? histLearnedSpeed : "N/D",
         target: targetSpeed,
         coasting: isCoasting ? 1 : 0,
-        livello_traffico: trafficLevel,
-        stato: stato
+        stato: stato,
+        // Colonne Diagnostica
+        tomtom_status: dbgTomTomStatus,
+        tomtom_latenza_ms: dbgTomTomLatencyMs,
+        sonda_dist_m: dbgProbeDistM,
+        sonda_lat: dbgProbeLat,
+        sonda_lon: dbgProbeLon,
+        osm_status: dbgOsmStatus,
+        osm_tipo_strada: dbgOsmType,
+        db_hit_status: dbgDbStatus,
+        db_settore_id: dbgSectorId,
+        wakelock_attivo: isLockActive ? 1 : 0
       });
     }
 
@@ -633,91 +840,86 @@
       statusMsgEl.style.color = "#FF3D00";
     }
 
-    // ==========================================
-    // 4. FEEDBACK GRAFICO & AUDIO (NO ACCELERA!)
-    // ==========================================
-    function aggiornaIndicazioniFlusso(vReale, vTarget, coastingAttivo) {
+    function aggiornaHUD(vReale, vTarget, coastingAttivo) {
       const diff = vReale - vTarget;
       const now = Date.now();
 
-      // Indicatore su barra grafica (centrato su 0 di scarto)
       const clampDiff = Math.max(-25, Math.min(25, diff));
       const leftPercent = 40 + (clampDiff / 25) * 40;
       smoothingIndicatorEl.style.left = `${leftPercent}%`;
 
       if (coastingAttivo) {
-        advisedBoxEl.innerHTML = `VELEGGIA &rarr; FLUSSO A <span style="color:#FFB300;">${vTarget}</span> KM/H`;
-        advisedBoxEl.style.borderColor = "#FF9100";
+        actionBannerEl.className = "action-banner coasting";
+        actionBannerEl.innerText = "VELEGGIA / RILASCIA";
+        targetSpeedValEl.style.color = "#FFB300";
         smoothingIndicatorEl.style.backgroundColor = "#FF9100";
-        gpsSpeedEl.style.color = "#FFB300";
+        mySpeedBoxEl.style.borderColor = "#FF9100";
 
         if (now - lastChimeTime > 7000) {
           playChime('coast');
           lastChimeTime = now;
         }
       } else if (vReale > currentLimit + 4) {
-        // Unico caso di avviso vocale di rallentamento: vero eccesso sul limite di legge
-        const delta = Math.round(vReale - currentLimit);
-        advisedBoxEl.innerHTML = `LIMITE SUPERATO &rarr; <span style="color:#FF3D00;">${currentLimit}</span> KM/H`;
-        advisedBoxEl.style.borderColor = "#FF3D00";
+        actionBannerEl.className = "action-banner alert";
+        actionBannerEl.innerText = `RALLENTA (LIMITE ${currentLimit})`;
+        targetSpeedValEl.style.color = "#FF3D00";
         smoothingIndicatorEl.style.backgroundColor = "#FF3D00";
-        gpsSpeedEl.style.color = "#FF3D00";
+        mySpeedBoxEl.style.borderColor = "#FF3D00";
 
         if (audioEnabled && (now - lastVoiceNoticeTime > 12000)) {
-          if (Math.abs(delta - lastAnnouncedDelta) >= 3 || (now - lastVoiceNoticeTime > 18000)) {
-            speak(`Limite ${currentLimit}`);
-            lastAnnouncedDelta = delta;
-            lastVoiceNoticeTime = now;
-          }
+          speak(`Limite ${currentLimit}`);
+          lastVoiceNoticeTime = now;
         }
       } else {
-        // Andatura corretta: NESSUN ORDINE DI ACCELERARE!
-        // Mostra semplicemente la velocità di crociera del flusso
-        advisedBoxEl.innerHTML = `CROCIERA FLUSSO: <span style="color:#00E676;">${vTarget}</span> KM/H`;
-        advisedBoxEl.style.borderColor = "#00E676";
+        actionBannerEl.className = "action-banner";
+        actionBannerEl.innerText = "FLUSSO REGOLARE";
+        targetSpeedValEl.style.color = "#00E676";
         smoothingIndicatorEl.style.backgroundColor = "#00E676";
-        gpsSpeedEl.style.color = "#00E676";
-        lastAnnouncedDelta = 0;
+        mySpeedBoxEl.style.borderColor = "#242424";
       }
     }
 
     // ==========================================
-    // 5. RADAR TOMTOM (FLUSSO REALE & DENSITÀ)
+    // 4. RADAR TOMTOM CON DIAGNOSTICA COMPLETA
     // ==========================================
     async function interrogaRadarTraffico(lat, lon, headingDeg, speedKmh) {
-      // Sonda proporzionata: 500m in città, 1200m a velocità sostenuta
-      const distanzaSondaMetri = speedKmh > 70 ? 1200 : 500;
-      const sonda = proiettaCoordinate(lat, lon, distanzaSondaMetri, headingDeg);
+      dbgProbeDistM = speedKmh > 70 ? 1200 : 500;
+      const sonda = proiettaCoordinate(lat, lon, dbgProbeDistM, headingDeg);
+      dbgProbeLat = sonda.lat;
+      dbgProbeLon = sonda.lon;
+
       const url = `https://api.tomtom.com/traffic/services/4/flowSegmentData/absolute/10/json?point=${sonda.lat},${sonda.lon}&key=${tomtomApiKey}`;
+      const tStart = performance.now();
 
       try {
         const res = await fetch(url);
+        dbgTomTomLatencyMs = Math.round(performance.now() - tStart);
+
+        if (!res.ok) {
+          dbgTomTomStatus = `HTTP_${res.status}`;
+          radarStatusEl.innerText = `ERR ${res.status}`;
+          return;
+        }
+
         const data = await res.json();
+        dbgTomTomStatus = "200_OK";
 
         if (data && data.flowSegmentData) {
           liveFlowSpeed = data.flowSegmentData.currentSpeed;
           liveFreeFlowSpeed = data.flowSegmentData.freeFlowSpeed;
-
-          // Calcola il livello di densità del flusso
-          const ratio = liveFlowSpeed / Math.max(1, liveFreeFlowSpeed);
-          if (ratio >= 0.85) {
-            trafficLevel = "LIBERO";
-            radarStatusEl.innerText = `${liveFlowSpeed} km/h (Libero)`;
-          } else if (ratio >= 0.60) {
-            trafficLevel = "MODERATO";
-            radarStatusEl.innerText = `${liveFlowSpeed} km/h (Denso)`;
-          } else {
-            trafficLevel = "RALLENTATO";
-            radarStatusEl.innerText = `${liveFlowSpeed} km/h (Coda)`;
-          }
+          radarStatusEl.innerText = `${liveFlowSpeed} km/h`;
+        } else {
+          dbgTomTomStatus = "NO_DATA_FIELD";
         }
       } catch (err) {
+        dbgTomTomLatencyMs = Math.round(performance.now() - tStart);
+        dbgTomTomStatus = "FETCH_FAIL";
         radarStatusEl.innerText = "OFFLINE";
       }
     }
 
     // ==========================================
-    // 6. LIMITI STRADALI OPENSTREETMAP
+    // 5. OSM OVERPASS CON DIAGNOSTICA
     // ==========================================
     async function aggiornaLimiteStradale(lat, lon) {
       if (lastQueryPos) {
@@ -732,7 +934,15 @@
           method: "POST",
           body: "data=" + encodeURIComponent(query)
         });
+
+        if (!res.ok) {
+          dbgOsmStatus = `HTTP_${res.status}`;
+          return;
+        }
+
         const data = await res.json();
+        dbgOsmStatus = "200_OK";
+
         const fallback = {
           "motorway": 130, "trunk": 110, "primary": 90,
           "secondary": 90, "tertiary": 50, "residential": 50, "unclassified": 50, "living_street": 30
@@ -741,15 +951,20 @@
         for (const el of data.elements || []) {
           const tags = el.tags || {};
           if (tags.maxspeed && !isNaN(parseInt(tags.maxspeed))) {
+            dbgOsmType = `TAG_MAXSPEED_${tags.maxspeed}`;
             impostaLimite(parseInt(tags.maxspeed));
             return;
           }
           if (tags.highway && fallback[tags.highway]) {
+            dbgOsmType = `FALLBACK_${tags.highway}`;
             impostaLimite(fallback[tags.highway]);
             return;
           }
         }
-      } catch (e) {}
+        dbgOsmType = "NO_MATCHING_HIGHWAY";
+      } catch (e) {
+        dbgOsmStatus = "FETCH_FAIL";
+      }
     }
 
     function impostaLimite(nuovoLimite) {
@@ -759,9 +974,6 @@
       }
     }
 
-    // ==========================================
-    // 7. REPORT DI EFFICIENZA
-    // ==========================================
     function mostraReportEfficienza() {
       if (tripData.length < 5) return;
 
@@ -777,9 +989,7 @@
         totalDistM += distanzaMetri(parseFloat(p1.lat), parseFloat(p1.lon), parseFloat(p2.lat), parseFloat(p2.lon));
         totalSpeed += p2.speed;
 
-        if (p2.speed === 0 && p1.speed > 0) {
-          stopsCount++;
-        }
+        if (p2.speed === 0 && p1.speed > 0) stopsCount++;
 
         const v1_ms = p1.speed / 3.6;
         const v2_ms = p2.speed / 3.6;
@@ -810,6 +1020,7 @@
       reportModal.style.display = 'none';
     }
 
+    // Geodesica & Utilità
     function proiettaCoordinate(lat, lon, distanzaM, bearingDeg) {
       const R = 6371000;
       const d = distanzaM / R;
@@ -859,19 +1070,73 @@
       btn.classList.toggle('active', audioEnabled);
     }
 
-    function esportaCSV() {
+    // ==========================================
+    // 6. ESPORTAZIONE CSV CON COLONNE DIAGNOSTICHE
+    // ==========================================
+    function esportaCSV(wasWakeLockActive) {
       if (tripData.length === 0) return;
 
-      let csvContent = "timestamp_iso,secondi_trascorsi,latitudine,longitudine,velocita_gps_kmh,limite_vigente_kmh,velocita_flusso_tomtom,velocita_consigliata_kmh,coasting_attivo,livello_traffico,stato\n";
-      tripData.forEach(row => {
-        csvContent += `${row.iso},${row.secondi},${row.lat},${row.lon},${row.speed},${row.limite},${row.velocita_flusso_tomtom},${row.target},${row.coasting},${row.livello_traffico},${row.stato}\n`;
+      const header = [
+        "timestamp_iso",
+        "secondi_trascorsi",
+        "latitudine",
+        "longitudine",
+        "velocita_gps_kmh",
+        "accuratezza_gps_m",
+        "heading_deg",
+        "limite_vigente_kmh",
+        "velocita_tomtom",
+        "velocita_storico_db",
+        "target_crociera",
+        "coasting_attivo",
+        "stato",
+        "tomtom_status",
+        "tomtom_latenza_ms",
+        "sonda_dist_m",
+        "sonda_lat",
+        "sonda_lon",
+        "osm_status",
+        "osm_tipo_strada",
+        "db_hit_status",
+        "db_settore_id",
+        "wakelock_attivo"
+      ].join(",");
+
+      let csvRows = [header];
+      tripData.forEach(r => {
+        csvRows.push([
+          r.iso,
+          r.secondi,
+          r.lat,
+          r.lon,
+          r.speed,
+          r.accuratezza_gps_m,
+          r.heading_deg,
+          r.limite,
+          r.velocita_tomtom,
+          r.velocita_storico_db,
+          r.target,
+          r.coasting,
+          r.stato,
+          r.tomtom_status,
+          r.tomtom_latenza_ms,
+          r.sonda_dist_m,
+          r.sonda_lat,
+          r.sonda_lon,
+          r.osm_status,
+          r.osm_tipo_strada,
+          r.db_hit_status,
+          r.db_settore_id,
+          r.wakelock_attivo
+        ].join(","));
       });
 
+      const csvContent = csvRows.join("\n");
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       const d = new Date();
-      const filename = `viaggio_flusso_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}.csv`;
+      const filename = `viaggio_telemetria_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}.csv`;
 
       link.setAttribute("href", url);
       link.setAttribute("download", filename);
